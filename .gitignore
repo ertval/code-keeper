@@ -1,0 +1,39 @@
+# Secrets and Credentials
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.cer
+*.crt
+id_rsa*
+secrets.yml
+
+# Terraform State and Sensitive files
+*.tfstate
+*.tfstate.*
+*.tfvars.json
+.terraform/
+.terraform.lock.hcl
+*.tfplan
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+junit-report.xml
+
+# Logs
+*.log
+logs/
+
+# Ansible retry files
+*.retry
+
+# OS / Editor files
+.DS_Store
+.vscode/
+.idea/

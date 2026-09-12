@@ -1,0 +1,34 @@
+---
+- name: Install prerequisite packages for GitLab Runner and Docker
+  ansible.builtin.apt:
+    name:
+      - curl
+      - apt-transport-https
+      - ca-certificates
+      - gnupg
+      - lsb-release
+      - docker.io
+    state: present
+    update_cache: true
+
+- name: Ensure Docker service is enabled and running
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Check if GitLab Runner repository is present
+  ansible.builtin.stat:
+    path: /etc/apt/sources.list.d/runner_gitlab-runner.list
+  register: runner_repo_file
+
+- name: Add official GitLab Runner APT repository
+  ansible.builtin.shell: |
+    curl -fsSL https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh | bash
+  when: not runner_repo_file.stat.exists
+
+- name: Install GitLab Runner package
+  ansible.builtin.apt:
+    name: "{{ gitlab_runner_package }}"
+    state: present
+    update_cache: true

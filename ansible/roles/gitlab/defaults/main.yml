@@ -1,0 +1,27 @@
+---
+# Defaults for role: gitlab
+gitlab_edition: "gitlab-ce"
+gitlab_version: ""
+gitlab_external_url: "http://gitlab.example.com"
+gitlab_root_password: "{{ lookup('env', 'GITLAB_ROOT_PASSWORD') | default('GitLabAdminSecure2026!', true) }}"
+gitlab_root_email: "admin@example.com"
+gitlab_time_zone: "UTC"
+gitlab_email_enabled: false
+
+# GitLab Security & Access Defaults
+gitlab_signup_enabled: false
+gitlab_default_projects_limit: 50
+gitlab_default_branch_name: "main"
+gitlab_default_branch_protection: 2  # 2 = Fully protected (Developers cannot push, only Maintainers)
+
+# CI/CD Settings
+gitlab_shared_runners_enabled: true
+gitlab_artifacts_max_size: 100
+gitlab_artifacts_expire_in: "30 days"
+gitlab_auto_devops_enabled: false
+
+# Omnibus Performance Tuning
+gitlab_puma_workers: 2
+gitlab_puma_min_threads: 1
+gitlab_puma_max_threads: 4
+gitlab_sidekiq_concurrency: 10

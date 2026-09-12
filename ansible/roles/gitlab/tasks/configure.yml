@@ -1,0 +1,43 @@
+---
+- name: Ensure /etc/gitlab configuration directory exists
+  ansible.builtin.file:
+    path: /etc/gitlab
+    state: directory
+    mode: '0775'
+    owner: root
+    group: root
+
+- name: Deploy gitlab.rb configuration template
+  ansible.builtin.template:
+    src: gitlab.rb.j2
+    dest: /etc/gitlab/gitlab.rb
+    owner: root
+    group: root
+    mode: '0600'
+  notify:
+    - Reconfigure GitLab
+    - Restart GitLab
+
+- name: Flush handlers to execute immediate reconfiguration if changed
+  ansible.builtin.meta: flush_handlers
+
+- name: Check initial root password file if exists
+  ansible.builtin.stat:
+    path: /etc/gitlab/initial_root_password
+  register: root_password_file
+
+- name: Display note about initial root password file
+  ansible.builtin.debug:
+    msg: "Initial root credentials stored at /etc/gitlab/initial_root_password (valid for 24h)"
+  when: root_password_file.stat.exists
+
+- name: Wait for GitLab web interface to respond
+  ansible.builtin.uri:
+    url: "http://127.0.0.1/-/readiness"
+    status_code: [200, 502, 503]
+    timeout: 10
+  register: gitlab_readiness
+  until: gitlab_readiness.status == 200
+  retries: 30
+  delay: 10
+  ignore_errors: true

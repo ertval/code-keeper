@@ -1,0 +1,151 @@
+# ==============================================================================
+# GitLab CI/CD Pipeline: Infrastructure as Code (Terraform)
+# Stages: Init, Validate, Plan, Apply to Staging, Approval, Apply to Production
+# Security: Protected branch restriction, masked AWS credentials, least privilege
+# ==============================================================================
+
+stages:
+  - Init
+  - Validate
+  - Plan
+  - Apply to Staging
+  - Approval
+  - Apply to Production
+
+default:
+  image:
+    name: hashicorp/terraform:1.6
+    entrypoint: [""]
+  before_script:
+    - terraform --version
+
+variables:
+  TF_IN_AUTOMATION: "true"
+  AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+  # Credentials separated into GitLab CI/CD Masked/Protected Variables:
+  # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+
+cache:
+  key: "${CI_COMMIT_REF_SLUG}-terraform"
+  paths:
+    - infra/environments/staging/.terraform
+    - infra/environments/production/.terraform
+    - .terraform.lock.hcl
+
+# ------------------------------------------------------------------------------
+# Stage 1: Init
+# ------------------------------------------------------------------------------
+init:staging:
+  stage: Init
+  script:
+    - cd infra/environments/staging
+    - terraform init -input=false
+  artifacts:
+    paths:
+      - infra/environments/staging/.terraform
+      - infra/environments/staging/.terraform.lock.hcl
+    expire_in: 1 day
+
+init:production:
+  stage: Init
+  script:
+    - cd infra/environments/production
+    - terraform init -input=false
+  artifacts:
+    paths:
+      - infra/environments/production/.terraform
+      - infra/environments/production/.terraform.lock.hcl
+    expire_in: 1 day
+
+# ------------------------------------------------------------------------------
+# Stage 2: Validate
+# ------------------------------------------------------------------------------
+validate:syntax:
+  stage: Validate
+  script:
+    - cd infra
+    - terraform fmt -check -recursive
+    - cd environments/staging && terraform validate
+    - cd ../production && terraform validate
+
+validate:security:
+  stage: Validate
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  before_script: []
+  script:
+    - trivy config --severity HIGH,CRITICAL --exit-code 0 infra/
+  allow_failure: true
+
+# ------------------------------------------------------------------------------
+# Stage 3: Plan
+# ------------------------------------------------------------------------------
+plan:staging:
+  stage: Plan
+  script:
+    - cd infra/environments/staging
+    - terraform plan -input=false -out=staging.tfplan
+  artifacts:
+    name: "staging-tfplan-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - infra/environments/staging/staging.tfplan
+    expire_in: 7 days
+
+plan:production:
+  stage: Plan
+  script:
+    - cd infra/environments/production
+    - terraform plan -input=false -out=production.tfplan
+  artifacts:
+    name: "production-tfplan-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - infra/environments/production/production.tfplan
+    expire_in: 7 days
+
+# ------------------------------------------------------------------------------
+# Stage 4: Apply to Staging (Automated on Protected Main Branch)
+# ------------------------------------------------------------------------------
+apply:staging:
+  stage: Apply to Staging
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - cd infra/environments/staging
+    - terraform apply -input=false -auto-approve staging.tfplan
+  environment:
+    name: staging
+    url: https://staging.code-keeper.internal
+
+# ------------------------------------------------------------------------------
+# Stage 5: Approval (Manual Gate for Production Promotion)
+# ------------------------------------------------------------------------------
+approval:production:
+  stage: Approval
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  when: manual
+  allow_failure: false
+  script:
+    - echo "============================================================"
+    - echo " Production Deployment Approval Granted by Operator"
+    - echo " Authorizing promotion of changes from staging to production"
+    - echo " Commit: ${CI_COMMIT_SHA} by ${GITLAB_USER_NAME}"
+    - echo "============================================================"
+
+# ------------------------------------------------------------------------------
+# Stage 6: Apply to Production (Executes Only After Manual Approval)
+# ------------------------------------------------------------------------------
+apply:production:
+  stage: Apply to Production
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - approval:production
+    - plan:production
+  script:
+    - cd infra/environments/production
+    - terraform apply -input=false -auto-approve production.tfplan
+  environment:
+    name: production
+    url: https://production.code-keeper.internal

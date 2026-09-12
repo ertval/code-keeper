@@ -1,0 +1,10 @@
+---
+# Main entrypoint for role: gitlab
+- name: Include package installation tasks
+  ansible.builtin.import_tasks: install.yml
+
+- name: Include configuration tasks
+  ansible.builtin.import_tasks: configure.yml
+
+- name: Include CI/CD settings customization tasks
+  ansible.builtin.import_tasks: cicd.yml

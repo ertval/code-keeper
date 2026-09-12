@@ -1,0 +1,34 @@
+---
+# Playbook: Deploy and Register GitLab Runners
+# Purpose: Automates Docker executor runner installation, token registration, and systemd management
+- name: Deploy and Configure GitLab Runners
+  hosts: gitlab_runners
+  become: true
+  gather_facts: true
+
+  vars:
+    gitlab_runner_url: "{{ lookup('env', 'GITLAB_EXTERNAL_URL') | default('http://gitlab.example.com', true) }}"
+    gitlab_runner_registration_token: "{{ lookup('env', 'GITLAB_RUNNER_TOKEN') | default('glrt-mock-runner-token-12345', true) }}"
+    gitlab_runner_executor: "docker"
+    gitlab_runner_default_image: "docker:24.0.5"
+
+  roles:
+    - role: gitlab_runner
+
+  post_tasks:
+    - name: Check registered runners
+      ansible.builtin.command: gitlab-runner list
+      register: runner_status
+      changed_when: false
+
+    - name: Verify GitLab Runner systemd daemon status
+      ansible.builtin.systemd:
+        name: gitlab-runner
+        state: started
+      register: runner_service
+
+    - name: Print GitLab Runner verification summary
+      ansible.builtin.debug:
+        msg:
+          - "GitLab Runner service active: {{ runner_service.status.ActiveState | default('active') }}"
+          - "Registered runners: {{ runner_status.stderr_lines + runner_status.stdout_lines }}"

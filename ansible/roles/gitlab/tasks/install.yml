@@ -1,0 +1,31 @@
+---
+- name: Install prerequisite packages for GitLab
+  ansible.builtin.apt:
+    name:
+      - curl
+      - openssh-server
+      - ca-certificates
+      - tzdata
+      - perl
+      - gnupg
+      - lsb-release
+    state: present
+    update_cache: true
+
+- name: Check if GitLab repository is already configured
+  ansible.builtin.stat:
+    path: /etc/apt/sources.list.d/gitlab_gitlab-ce.list
+  register: gitlab_repo_file
+
+- name: Download and add GitLab CE repository script
+  ansible.builtin.shell: |
+    curl -fsSL https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | bash
+  when: not gitlab_repo_file.stat.exists
+
+- name: Install GitLab CE package
+  ansible.builtin.apt:
+    name: "{{ gitlab_edition }}{{ '=' + gitlab_version if gitlab_version else '' }}"
+    state: present
+    update_cache: true
+  environment:
+    EXTERNAL_URL: "{{ gitlab_external_url }}"

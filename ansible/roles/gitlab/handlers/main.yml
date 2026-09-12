@@ -1,0 +1,9 @@
+---
+# Handlers for role: gitlab
+- name: Reconfigure GitLab
+  ansible.builtin.command: gitlab-ctl reconfigure
+  listen: "reconfigure gitlab"
+
+- name: Restart GitLab
+  ansible.builtin.command: gitlab-ctl restart
+  listen: "restart gitlab"

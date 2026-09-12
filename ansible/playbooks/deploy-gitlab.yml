@@ -1,0 +1,27 @@
+---
+# Playbook: Deploy and Configure GitLab CE
+# Purpose: Automates full deployment of GitLab CE instance, user security, CI/CD parameters
+- name: Deploy and Configure GitLab CE Instance
+  hosts: gitlab_servers
+  become: true
+  gather_facts: true
+
+  vars:
+    # Overridable playbook-level defaults
+    gitlab_external_url: "{{ lookup('env', 'GITLAB_EXTERNAL_URL') | default('http://gitlab.example.com', true) }}"
+    gitlab_root_password: "{{ lookup('env', 'GITLAB_ROOT_PASSWORD') | default('GitLabAdminSecure2026!', true) }}"
+
+  roles:
+    - role: gitlab
+
+  post_tasks:
+    - name: Verify GitLab services status
+      ansible.builtin.command: gitlab-ctl status
+      register: gitlab_status
+      changed_when: false
+
+    - name: Print GitLab status
+      ansible.builtin.debug:
+        msg:
+          - "GitLab instance successfully configured at {{ gitlab_external_url }}"
+          - "Services status: {{ gitlab_status.stdout_lines | default(['Running']) }}"

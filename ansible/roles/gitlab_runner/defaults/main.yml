@@ -1,0 +1,22 @@
+---
+# Defaults for role: gitlab_runner
+gitlab_runner_package: "gitlab-runner"
+gitlab_runner_url: "http://gitlab.example.com"
+gitlab_runner_registration_token: "{{ lookup('env', 'GITLAB_RUNNER_TOKEN') | default('glrt-mock-runner-token-12345', true) }}"
+gitlab_runner_description: "docker-shared-runner-01"
+gitlab_runner_executor: "docker"
+gitlab_runner_default_image: "docker:24.0.5"
+gitlab_runner_docker_privileged: true
+gitlab_runner_docker_volumes:
+  - "/var/run/docker.sock:/var/run/docker.sock"
+  - "/cache"
+gitlab_runner_tags:
+  - "docker"
+  - "shared"
+  - "ci-cd"
+  - "linux"
+gitlab_runner_concurrent: 4
+gitlab_runner_check_interval: 0
+gitlab_runner_run_untagged: true
+gitlab_runner_locked: false
+gitlab_runner_access_level: "not_protected"

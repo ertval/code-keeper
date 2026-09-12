@@ -1,0 +1,10 @@
+---
+# Main entrypoint for role: gitlab_runner
+- name: Include package installation and Docker setup tasks
+  ansible.builtin.import_tasks: install.yml
+
+- name: Include runner registration tasks
+  ansible.builtin.import_tasks: register.yml
+
+- name: Include service configuration tasks
+  ansible.builtin.import_tasks: configure.yml

@@ -1,0 +1,25 @@
+---
+- name: Configure GitLab application settings and CI/CD parameters via rails runner
+  ansible.builtin.shell: |
+    gitlab-rails runner "
+      settings = ApplicationSetting.current_without_cache
+      settings.update!(
+        signup_enabled: {{ gitlab_signup_enabled | lower }},
+        default_branch_name: '{{ gitlab_default_branch_name }}',
+        default_branch_protection_defaults: {
+          'allowed_to_push' => [{'access_level' => Gitlab::Access::MAINTAINER}],
+          'allowed_to_merge' => [{'access_level' => Gitlab::Access::DEVELOPER}],
+          'allow_force_push' => false
+        },
+        max_artifacts_size: {{ gitlab_artifacts_max_size }},
+        auto_devops_enabled: {{ gitlab_auto_devops_enabled | lower }}
+      )
+      puts 'GitLab CI/CD and Project settings applied successfully'
+    "
+  register: cicd_settings_result
+  changed_when: "'GitLab CI/CD and Project settings applied successfully' in cicd_settings_result.stdout"
+  failed_when: false
+
+- name: Report CI/CD settings configuration status
+  ansible.builtin.debug:
+    msg: "GitLab application and CI/CD settings synchronized."

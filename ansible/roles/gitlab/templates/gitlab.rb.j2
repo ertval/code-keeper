@@ -1,0 +1,37 @@
+## GitLab Configuration Managed by Ansible (code-keeper)
+## Generated from template gitlab.rb.j2
+
+# URL configuration
+external_url '{{ gitlab_external_url }}'
+
+# Initial Credentials
+gitlab_rails['initial_root_password'] = '{{ gitlab_root_password }}'
+
+# System Settings
+gitlab_rails['time_zone'] = '{{ gitlab_time_zone }}'
+gitlab_rails['gitlab_email_enabled'] = {{ gitlab_email_enabled | lower }}
+
+# Security & Registration Controls
+gitlab_rails['gitlab_signup_enabled'] = {{ gitlab_signup_enabled | lower }}
+gitlab_rails['gitlab_default_projects_limit'] = {{ gitlab_default_projects_limit }}
+
+# CI/CD Pipeline Settings
+gitlab_rails['gitlab_default_projects_features_builds'] = true
+gitlab_rails['artifacts_enabled'] = true
+gitlab_rails['artifacts_path'] = "/var/opt/gitlab/gitlab-rails/shared/artifacts"
+gitlab_rails['artifacts_expire_in'] = '{{ gitlab_artifacts_expire_in }}'
+
+# Resource Optimization
+puma['worker_processes'] = {{ gitlab_puma_workers }}
+puma['min_threads'] = {{ gitlab_puma_min_threads }}
+puma['max_threads'] = {{ gitlab_puma_max_threads }}
+sidekiq['concurrency'] = {{ gitlab_sidekiq_concurrency }}
+
+# Embedded NGINX
+nginx['enable'] = true
+nginx['listen_port'] = 80
+nginx['listen_https'] = false
+nginx['client_max_body_size'] = '250m'
+
+# Backup Retention (in seconds, 7 days = 604800)
+gitlab_rails['backup_keep_time'] = 604800

@@ -1,0 +1,30 @@
+---
+- name: Check if GitLab Runner is already registered
+  ansible.builtin.shell: |
+    gitlab-runner list 2>&1
+  register: existing_runners
+  changed_when: false
+  failed_when: false
+
+- name: Register GitLab Runner with Docker executor
+  ansible.builtin.command: >
+    gitlab-runner register
+    --non-interactive
+    --url "{{ gitlab_runner_url }}"
+    --registration-token "{{ gitlab_runner_registration_token }}"
+    --executor "{{ gitlab_runner_executor }}"
+    --docker-image "{{ gitlab_runner_default_image }}"
+    --description "{{ gitlab_runner_description }}"
+    --tag-list "{{ gitlab_runner_tags | join(',') }}"
+    --run-untagged="{{ gitlab_runner_run_untagged | lower }}"
+    --locked="{{ gitlab_runner_locked | lower }}"
+    --access-level="{{ gitlab_runner_access_level }}"
+    --docker-privileged={{ gitlab_runner_docker_privileged | lower }}
+    {% for vol in gitlab_runner_docker_volumes %}
+    --docker-volumes "{{ vol }}"
+    {% endfor %}
+  when: "gitlab_runner_description not in existing_runners.stdout and gitlab_runner_url not in existing_runners.stdout"
+  register: runner_registration
+  failed_when: false
+  notify:
+    - Restart GitLab Runner

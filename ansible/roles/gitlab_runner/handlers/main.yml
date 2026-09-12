@@ -1,0 +1,7 @@
+---
+# Handlers for role: gitlab_runner
+- name: Restart GitLab Runner
+  ansible.builtin.service:
+    name: gitlab-runner
+    state: restarted
+  listen: "restart gitlab-runner"
