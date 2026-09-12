@@ -208,6 +208,59 @@ else:
 PYEOF
 if [ $? -eq 0 ]; then log_pass "Terraform parity verified"; else log_fail "Terraform parity failed"; fi
 
+# 9. Terraform Code Formatting Check
+log_header "9. Validating Terraform Code Formatting (terraform fmt -check)"
+if command -v terraform &>/dev/null; then
+  if terraform fmt -check -recursive infra; then
+    log_pass "Terraform formatting check passed across all modules and environments"
+  else
+    log_fail "Terraform formatting check failed! Run 'terraform fmt -recursive infra'"
+  fi
+else
+  log_info "terraform binary not installed; skipping format check"
+fi
+
+# 10. Ansible Playbooks & Roles Syntax & Task Listing Checks
+log_header "10. Validating Ansible Playbooks, Roles & Task Resolution"
+if command -v ansible-playbook &>/dev/null; then
+  if ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy-gitlab.yml --syntax-check >/dev/null && \
+     ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy-runners.yml --syntax-check >/dev/null; then
+    log_pass "Ansible playbooks passed syntax check (--syntax-check)"
+  else
+    log_fail "Ansible playbook syntax check failed"
+  fi
+
+  if ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy-gitlab.yml --list-tasks >/dev/null && \
+     ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy-runners.yml --list-tasks >/dev/null; then
+    log_pass "Ansible playbooks successfully resolved roles and listed all tasks (--list-tasks)"
+  else
+    log_fail "Ansible playbook failed to resolve roles or list tasks"
+  fi
+else
+  log_info "ansible-playbook binary not installed; skipping playbook syntax check"
+fi
+
+# 11. Microservice Unit Test Execution
+log_header "11. Validating Microservice Unit Test Execution"
+SERVICES=("api-gateway" "inventory-app" "billing-app")
+for svc in "${SERVICES[@]}"; do
+  if command -v uv &>/dev/null; then
+    if (cd "$svc" && uv run --with pytest --with pytest-cov --with-requirements requirements.txt pytest -q >/dev/null 2>&1); then
+      log_pass "Unit test suite passed for $svc"
+    else
+      log_fail "Unit test suite failed for $svc"
+    fi
+  elif command -v pytest &>/dev/null; then
+    if (cd "$svc" && pytest -q >/dev/null 2>&1); then
+      log_pass "Unit test suite passed for $svc"
+    else
+      log_fail "Unit test suite failed for $svc"
+    fi
+  else
+    log_info "pytest/uv not in PATH; skipping live unit test execution"
+  fi
+done
+
 # Summary
 echo -e "\n${BOLD}============================================================${NC}"
 echo -e "${BOLD}  PIPELINE VALIDATION SUMMARY                               ${NC}"

@@ -319,8 +319,11 @@ Run the provided verification scripts to audit all pipelines and security contro
   [PASS] Python bytecode compilation succeeded (python3 -m compileall)
   [PASS] Dockerfiles enforce non-root unprivileged execution (USER appuser)
   [PASS] Terraform staging vs production structural parity verified
+  [PASS] Terraform code formatting check passed (terraform fmt -check)
+  [PASS] Ansible playbooks and roles syntax & task listing verified
+  [PASS] Microservice unit test suites passed across all components
 ============================================================
-  Total Checks Passed: 36 | Total Checks Failed: 0
+  Total Checks Passed: 42 | Total Checks Failed: 0
   >>> ALL CODE-KEEPER PIPELINE TESTS PASSED! <<<
 
 ============================================================
