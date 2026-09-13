@@ -18,9 +18,14 @@ echo " Playbook:  ${PLAYBOOK}"
 echo " Mode:      ${MODE}"
 echo "============================================================"
 
-# Ensure required environment variables or fallbacks
+# Root password must come from the environment (CI masked variable).
+# No fallback secret is committed in this repo.
 export GITLAB_EXTERNAL_URL="${GITLAB_EXTERNAL_URL:-http://gitlab.example.com}"
-export GITLAB_ROOT_PASSWORD="${GITLAB_ROOT_PASSWORD:-GitLabAdminSecure2026!}"
+if [ -z "${GITLAB_ROOT_PASSWORD:-}" ]; then
+  echo "[ERROR] GITLAB_ROOT_PASSWORD env var must be set (CI masked variable). Refusing to use a default password." >&2
+  exit 1
+fi
+export GITLAB_ROOT_PASSWORD
 
 if ! command -v ansible-playbook &>/dev/null; then
   echo "[WARNING] 'ansible-playbook' command not found in current environment PATH."

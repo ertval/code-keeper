@@ -18,7 +18,7 @@
     "
   register: cicd_settings_result
   changed_when: "'GitLab CI/CD and Project settings applied successfully' in cicd_settings_result.stdout"
-  failed_when: false
+  failed_when: cicd_settings_result.rc != 0
 
 - name: Report CI/CD settings configuration status
   ansible.builtin.debug:

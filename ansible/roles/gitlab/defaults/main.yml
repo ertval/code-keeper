@@ -1,9 +1,17 @@
 ---
 # Defaults for role: gitlab
 gitlab_edition: "gitlab-ce"
+# Pin the GitLab version for reproducible installs (empty = latest; set e.g. "16.11.0-ce.0" in production).
 gitlab_version: ""
+# APT repository setup script: downloaded to disk first (no curl|bash pipe) so
+# it can be reviewed; pin its sha256 below once vendored for your release.
+# Example: sha256sum /tmp/gitlab-repo-script.deb.sh -> paste digest here.
+gitlab_repo_script_url: "https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh"
+gitlab_repo_script_sha256: ""
 gitlab_external_url: "http://gitlab.example.com"
-gitlab_root_password: "{{ lookup('env', 'GITLAB_ROOT_PASSWORD') | default('GitLabAdminSecure2026!', true) }}"
+# No default password committed. Must be provided via GITLAB_ROOT_PASSWORD
+# environment variable (CI masked var). Playbooks assert it is set.
+gitlab_root_password: "{{ lookup('env', 'GITLAB_ROOT_PASSWORD') }}"
 gitlab_root_email: "admin@example.com"
 gitlab_time_zone: "UTC"
 gitlab_email_enabled: false

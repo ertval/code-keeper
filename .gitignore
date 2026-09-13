@@ -10,11 +10,11 @@ id_rsa*
 secrets.yml
 
 # Terraform State and Sensitive files
+# NOTE: .terraform.lock.hcl is intentionally TRACKED (dependency pinning).
 *.tfstate
 *.tfstate.*
 *.tfvars.json
 .terraform/
-.terraform.lock.hcl
 *.tfplan
 
 # Python Cache & Bytecode

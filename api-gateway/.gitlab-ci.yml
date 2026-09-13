@@ -19,6 +19,16 @@ variables:
   IMAGE_STAGING: "${CI_REGISTRY_IMAGE}:staging-latest"
   IMAGE_PROD: "${CI_REGISTRY_IMAGE}:production-latest"
   DOCKER_TLS_CERTDIR: "/certs"
+  AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+  ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
+  ECS_CLUSTER_PROD: "code-keeper-production-cluster"
+
+# Strict audit: main-only pipelines (no MR pipelines).
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: always
+    - when: never
 
 # ------------------------------------------------------------------------------
 # Stage 1: Build
@@ -26,6 +36,13 @@ variables:
 build:package:
   stage: Build
   image: python:3.11-alpine
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        paths:
+          - api-gateway/**/*
+      when: on_success
+    - when: never
   script:
     - echo "=== [Build] Compiling Bytecode & Validating Packaging ==="
     - pip install --no-cache-dir -r requirements.txt
@@ -42,11 +59,18 @@ build:package:
 test:unit:
   stage: Test
   image: python:3.11-alpine
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        paths:
+          - api-gateway/**/*
+      when: on_success
+    - when: never
   before_script:
     - pip install --no-cache-dir -r requirements.txt pytest pytest-cov
   script:
     - echo "=== [Test] Running Unit and Integration Test Suite ==="
-    - pytest --cov=app --cov-report=term-missing tests/
+    - pytest --cov=app --cov-report=term-missing --junitxml=junit-report.xml tests/
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
     when: always
@@ -60,35 +84,66 @@ test:unit:
 scan:sast_bandit:
   stage: Scan
   image: python:3.11-alpine
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        paths:
+          - api-gateway/**/*
+      when: on_success
+    - when: never
   before_script:
     - pip install --no-cache-dir bandit
   script:
     - echo "=== [Scan] Executing Bandit AST Security Analysis ==="
-    - bandit -r app/ -ll -ii -f screen || true
+    - bandit -r app/ -ll -ii -f screen
+  allow_failure: false
 
 scan:secret_detection:
   stage: Scan
   image:
     name: zricethezav/gitleaks:latest
     entrypoint: [""]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        paths:
+          - api-gateway/**/*
+      when: on_success
+    - when: never
   script:
     - echo "=== [Scan] Checking for Hardcoded Credentials / Secrets ==="
-    - gitleaks detect --verbose --source . --no-git || true
+    - gitleaks detect --verbose --source . --no-git
+  allow_failure: false
 
 scan:trivy_fs:
   stage: Scan
   image:
     name: aquasec/trivy:latest
     entrypoint: [""]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        paths:
+          - api-gateway/**/*
+      when: on_success
+    - when: never
   script:
     - echo "=== [Scan] Running Trivy Filesystem Vulnerability Scan ==="
-    - trivy fs --severity HIGH,CRITICAL --exit-code 0 .
+    - trivy fs --severity HIGH,CRITICAL --exit-code 1 .
+  allow_failure: false
 
 scan:sonarqube:
   stage: Scan
   image:
     name: sonarsource/sonar-scanner-cli:latest
     entrypoint: [""]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        paths:
+          - api-gateway/**/*
+      when: on_success
+    - when: never
   script:
     - echo "=== [Scan] Running SonarQube Code Quality & Security Gate ==="
     - >
@@ -99,9 +154,9 @@ scan:sonarqube:
           -Dsonar.host.url="${SONAR_HOST_URL}" \
           -Dsonar.login="${SONAR_TOKEN}"
       else
-        echo "SonarQube credentials not configured; skipping remote upload."
+        echo "WARNING: SonarQube credentials not configured; skipping remote upload (configure SONAR_HOST_URL/SONAR_TOKEN to enforce the gate)."
       fi
-  allow_failure: true
+  allow_failure: false
 
 # ------------------------------------------------------------------------------
 # Stage 4: Containerization (Docker Build & Push - Protected Main Branch Only)
@@ -114,15 +169,15 @@ containerize:docker:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
   before_script:
-    - echo "${CI_REGISTRY_PASSWORD}" | docker login -u "${CI_REGISTRY_USER}" --password-stdin "${CI_REGISTRY}" || true
+    - echo "${CI_REGISTRY_PASSWORD}" | docker login -u "${CI_REGISTRY_USER}" --password-stdin "${CI_REGISTRY}"
   script:
     - echo "=== [Containerization] Building Docker Image ==="
     - docker build -t "${IMAGE_TAG}" -t "${IMAGE_STAGING}" .
     - echo "=== [Containerization] Scanning Built Image with Trivy ==="
-    - docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL --exit-code 0 "${IMAGE_TAG}" || true
+    - docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL --exit-code 1 "${IMAGE_TAG}"
     - echo "=== [Containerization] Pushing Image to Registry ==="
-    - docker push "${IMAGE_TAG}" || true
-    - docker push "${IMAGE_STAGING}" || true
+    - docker push "${IMAGE_TAG}"
+    - docker push "${IMAGE_STAGING}"
 
 # ------------------------------------------------------------------------------
 # Stage 5: Deploy to Staging
@@ -137,10 +192,9 @@ deploy:staging:
     url: https://staging.code-keeper.internal
   script:
     - echo "=== [CD] Deploying ${APP_NAME} to Staging Environment ==="
-    - >
-      echo "Updating ECS service code-keeper-staging-${APP_NAME} to image ${IMAGE_TAG}..."
-    - echo "Performing automated staging smoke test and health verification..."
-    - curl -f --retry 5 --retry-delay 3 "http://staging.code-keeper.internal/health" || echo "Staging mock health check PASSED"
+    - aws ecs update-service --cluster "${ECS_CLUSTER_STAGING}" --service "code-keeper-staging-${APP_NAME}" --force-new-deployment --region "${AWS_DEFAULT_REGION:-us-east-1}"
+    - aws ecs wait services-stable --cluster "${ECS_CLUSTER_STAGING}" --services "code-keeper-staging-${APP_NAME}" --region "${AWS_DEFAULT_REGION:-us-east-1}"
+    - curl -f --retry 5 --retry-delay 3 "http://staging.code-keeper.internal/health"
 
 # ------------------------------------------------------------------------------
 # Stage 6: Approval (Manual Gate for Production Promotion)
@@ -175,9 +229,6 @@ deploy:production:
     url: https://production.code-keeper.internal
   script:
     - echo "=== [CD] Executing Zero-Downtime Rolling Deployment to Production ==="
-    - >
-      echo "Initiating ECS Rolling Update for code-keeper-production-${APP_NAME}..."
-    - echo "Configuring minimumHealthyPercent=100%, maximumPercent=200% for zero downtime."
-    - echo "Tagging and promoting image to ${IMAGE_PROD}..."
-    - echo "Verifying production health check endpoint..."
-    - curl -f --retry 10 --retry-delay 5 "http://production.code-keeper.internal/health" || echo "Production mock health check PASSED"
+    - aws ecs update-service --cluster "${ECS_CLUSTER_PROD}" --service "code-keeper-production-${APP_NAME}" --force-new-deployment --region "${AWS_DEFAULT_REGION:-us-east-1}"
+    - aws ecs wait services-stable --cluster "${ECS_CLUSTER_PROD}" --services "code-keeper-production-${APP_NAME}" --region "${AWS_DEFAULT_REGION:-us-east-1}"
+    - curl -f --retry 10 --retry-delay 5 "http://production.code-keeper.internal/health"

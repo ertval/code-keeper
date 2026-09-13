@@ -7,9 +7,17 @@
   gather_facts: true
 
   vars:
-    # Overridable playbook-level defaults
+    # Overridable playbook-level defaults (no secrets committed here).
     gitlab_external_url: "{{ lookup('env', 'GITLAB_EXTERNAL_URL') | default('http://gitlab.example.com', true) }}"
-    gitlab_root_password: "{{ lookup('env', 'GITLAB_ROOT_PASSWORD') | default('GitLabAdminSecure2026!', true) }}"
+    gitlab_root_password: "{{ lookup('env', 'GITLAB_ROOT_PASSWORD') }}"
+
+  pre_tasks:
+    - name: Fail when GitLab root password is not provided
+      ansible.builtin.assert:
+        that:
+          - gitlab_root_password is defined
+          - gitlab_root_password | length > 0
+        fail_msg: "GITLAB_ROOT_PASSWORD env var (CI masked variable) must be set; no default password is committed."
 
   roles:
     - role: gitlab

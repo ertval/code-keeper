@@ -19,7 +19,9 @@
     --run-untagged="{{ gitlab_runner_run_untagged | lower }}"
     --locked="{{ gitlab_runner_locked | lower }}"
     --access-level="{{ gitlab_runner_access_level }}"
-    --docker-privileged={{ gitlab_runner_docker_privileged | lower }}
+    # Least privilege: never register privileged runners. Build container
+    # images with kaniko or rootless builders instead of docker-in-docker.
+    --docker-privileged=false
     {% for vol in gitlab_runner_docker_volumes %}
     --docker-volumes "{{ vol }}"
     {% endfor %}

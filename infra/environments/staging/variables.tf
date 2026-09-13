@@ -37,24 +37,21 @@ variable "availability_zones" {
 }
 
 variable "inventory_db_password" {
-  description = "Inventory DB Password"
+  description = "Inventory DB password. Set via TF_VAR_inventory_db_password / CI masked var TF_VAR_inventory_db_password."
   type        = string
   sensitive   = true
-  default     = "StagingDBPass2026!"
 }
 
 variable "billing_db_password" {
-  description = "Billing DB Password"
+  description = "Billing DB password. Set via TF_VAR_billing_db_password / CI masked var TF_VAR_billing_db_password."
   type        = string
   sensitive   = true
-  default     = "StagingDBPass2026!"
 }
 
 variable "rabbitmq_password" {
-  description = "RabbitMQ Admin Password"
+  description = "RabbitMQ admin password. Set via TF_VAR_rabbitmq_password / CI masked var TF_VAR_rabbitmq_password."
   type        = string
   sensitive   = true
-  default     = "StagingRabbitPass2026!"
 }
 
 variable "api_gateway_image" {

@@ -1,14 +1,23 @@
 ---
 # Defaults for role: gitlab_runner
 gitlab_runner_package: "gitlab-runner"
+# Pin the runner version for reproducible installs (empty = latest).
+gitlab_runner_version: ""
+# APT repository setup script: downloaded to disk first (no curl|bash pipe);
+# pin its sha256 below once vendored for your release.
+gitlab_runner_repo_script_url: "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh"
+gitlab_runner_repo_script_sha256: ""
 gitlab_runner_url: "http://gitlab.example.com"
-gitlab_runner_registration_token: "{{ lookup('env', 'GITLAB_RUNNER_TOKEN') | default('glrt-mock-runner-token-12345', true) }}"
+# No default token committed. Must be provided via GITLAB_RUNNER_TOKEN
+# environment variable (CI masked var). Playbooks assert it is set.
+gitlab_runner_registration_token: "{{ lookup('env', 'GITLAB_RUNNER_TOKEN') }}"
 gitlab_runner_description: "docker-shared-runner-01"
 gitlab_runner_executor: "docker"
 gitlab_runner_default_image: "docker:24.0.5"
-gitlab_runner_docker_privileged: true
+# Least privilege: unprivileged builds. Use kaniko/rootless builder images
+# for Docker image builds instead of docker-in-docker with host socket.
+gitlab_runner_docker_privileged: false
 gitlab_runner_docker_volumes:
-  - "/var/run/docker.sock:/var/run/docker.sock"
   - "/cache"
 gitlab_runner_tags:
   - "docker"

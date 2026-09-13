@@ -17,9 +17,18 @@
     path: /etc/apt/sources.list.d/gitlab_gitlab-ce.list
   register: gitlab_repo_file
 
-- name: Download and add GitLab CE repository script
-  ansible.builtin.shell: |
-    curl -fsSL https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | bash
+- name: Download GitLab CE repository setup script (no curl|bash pipe)
+  ansible.builtin.get_url:
+    url: "{{ gitlab_repo_script_url }}"
+    dest: /tmp/gitlab-repo-script.deb.sh
+    mode: '0750'
+    checksum: "{{ 'sha256:' + gitlab_repo_script_sha256 if gitlab_repo_script_sha256 | length > 0 else omit }}"
+  when: not gitlab_repo_file.stat.exists
+
+- name: Add GitLab CE APT repository via pinned setup script
+  ansible.builtin.command: bash /tmp/gitlab-repo-script.deb.sh
+  args:
+    creates: /etc/apt/sources.list.d/gitlab_gitlab-ce.list
   when: not gitlab_repo_file.stat.exists
 
 - name: Install GitLab CE package

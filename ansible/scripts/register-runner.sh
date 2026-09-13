@@ -11,7 +11,7 @@ INVENTORY="${BASE_DIR}/inventory/hosts.ini"
 PLAYBOOK="${BASE_DIR}/playbooks/deploy-runners.yml"
 
 MODE="${1:---ansible}"
-TOKEN="${2:-${GITLAB_RUNNER_TOKEN:-glrt-mock-runner-token-12345}}"
+TOKEN="${2:-${GITLAB_RUNNER_TOKEN:-}}"
 GITLAB_URL="${GITLAB_EXTERNAL_URL:-http://gitlab.example.com}"
 
 echo "============================================================"
@@ -62,6 +62,10 @@ print('YAML syntax validation PASSED for ${PLAYBOOK}')
       exit 1
     fi
     echo "[INFO] Registering runner directly via CLI..."
+    if [[ -z "${TOKEN}" ]]; then
+      echo "ERROR: GITLAB_RUNNER_TOKEN or token argument is required for direct registration" >&2
+      exit 1
+    fi
     gitlab-runner register \
       --non-interactive \
       --url "${GITLAB_URL}" \
@@ -71,8 +75,7 @@ print('YAML syntax validation PASSED for ${PLAYBOOK}')
       --description "docker-shared-runner-cli" \
       --tag-list "docker,shared,ci-cd" \
       --run-untagged="true" \
-      --docker-privileged="true" \
-      --docker-volumes "/var/run/docker.sock:/var/run/docker.sock" \
+      --docker-privileged="false" \
       --docker-volumes "/cache"
     echo "[SUCCESS] Direct runner registration complete."
     ;;

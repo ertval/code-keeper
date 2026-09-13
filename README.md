@@ -253,6 +253,22 @@ Each microservice (`api-gateway`, `inventory-app`, `billing-app`) operates an in
 6. **`Approval`**: Manual approval gate (`when: manual`) ensuring stakeholder review before production rollout.
 7. **`Deploy to Production`**: Executes zero-downtime rolling update on AWS ECS Production cluster (`minimumHealthyPercent=100`, `maximumPercent=200`), promotes image tag to `production-latest`, and validates production health probe.
 
+### 3.4 Monorepo Path-Gating (Simulated Service Independence)
+
+This repo is a monorepo, but each pipeline behaves like an independent repo via
+`rules:changes:paths`: `infra/**/*` gates Init/Validate/Plan, and
+`api-gateway/**/*`, `inventory-app/**/*`, `billing-app/**/*` gate the matching
+service's Build/Test/Scan jobs. Deploys stay `main`-only. All pipelines are
+strictly `main`-only (`workflow:rules`); there are no MR pipelines by audit
+requirement.
+
+Upstream mapping (crud-master / cloud-design): service names and variables
+mirror the sibling projects — `APP_NAME` (`api-gateway`, `inventory-app`,
+`billing-app`), Postgres DBs `movies` (inventory) / `orders` (billing),
+`RABBITMQ_QUEUE=billing_queue`, ECS cluster `code-keeper-<env>-cluster` and
+services `code-keeper-<env>-<app>` (see `infra/modules/compute/main.tf`),
+health endpoint `/health` (`:3000` gateway, `:8080` inventory/billing).
+
 ---
 
 ## 4. Cybersecurity Compliance & Best Practices

@@ -23,7 +23,15 @@ variables:
   TF_IN_AUTOMATION: "true"
   AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
   # Credentials separated into GitLab CI/CD Masked/Protected Variables:
-  # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+  # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+  # TF_VAR_inventory_db_password, TF_VAR_billing_db_password, TF_VAR_rabbitmq_password
+  # (Terraform reads TF_VAR_* automatically; never pass secrets via -var on the CLI.)
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: always
+    - when: never
 
 cache:
   key: "${CI_COMMIT_REF_SLUG}-terraform"
@@ -37,6 +45,13 @@ cache:
 # ------------------------------------------------------------------------------
 init:staging:
   stage: Init
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        paths:
+          - infra/**/*
+      when: on_success
+    - when: never
   script:
     - cd infra/environments/staging
     - terraform init -input=false
@@ -48,6 +63,13 @@ init:staging:
 
 init:production:
   stage: Init
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        paths:
+          - infra/**/*
+      when: on_success
+    - when: never
   script:
     - cd infra/environments/production
     - terraform init -input=false
@@ -62,6 +84,13 @@ init:production:
 # ------------------------------------------------------------------------------
 validate:syntax:
   stage: Validate
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        paths:
+          - infra/**/*
+      when: on_success
+    - when: never
   script:
     - cd infra
     - terraform fmt -check -recursive
@@ -74,17 +103,34 @@ validate:security:
     name: aquasec/trivy:latest
     entrypoint: [""]
   before_script: []
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        paths:
+          - infra/**/*
+      when: on_success
+    - when: never
   script:
-    - trivy config --severity HIGH,CRITICAL --exit-code 0 infra/
-  allow_failure: true
+    - trivy config --severity HIGH,CRITICAL --exit-code 1 infra/
+  allow_failure: false
 
 # ------------------------------------------------------------------------------
 # Stage 3: Plan
 # ------------------------------------------------------------------------------
 plan:staging:
   stage: Plan
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        paths:
+          - infra/**/*
+      when: on_success
+    - when: never
   script:
     - cd infra/environments/staging
+    - test -n "${TF_VAR_inventory_db_password:-}" || { echo "ERROR: TF_VAR_inventory_db_password CI masked var is unset"; exit 1; }
+    - test -n "${TF_VAR_billing_db_password:-}" || { echo "ERROR: TF_VAR_billing_db_password CI masked var is unset"; exit 1; }
+    - test -n "${TF_VAR_rabbitmq_password:-}" || { echo "ERROR: TF_VAR_rabbitmq_password CI masked var is unset"; exit 1; }
     - terraform plan -input=false -out=staging.tfplan
   artifacts:
     name: "staging-tfplan-${CI_COMMIT_SHORT_SHA}"
@@ -94,8 +140,18 @@ plan:staging:
 
 plan:production:
   stage: Plan
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        paths:
+          - infra/**/*
+      when: on_success
+    - when: never
   script:
     - cd infra/environments/production
+    - test -n "${TF_VAR_inventory_db_password:-}" || { echo "ERROR: TF_VAR_inventory_db_password CI masked var is unset"; exit 1; }
+    - test -n "${TF_VAR_billing_db_password:-}" || { echo "ERROR: TF_VAR_billing_db_password CI masked var is unset"; exit 1; }
+    - test -n "${TF_VAR_rabbitmq_password:-}" || { echo "ERROR: TF_VAR_rabbitmq_password CI masked var is unset"; exit 1; }
     - terraform plan -input=false -out=production.tfplan
   artifacts:
     name: "production-tfplan-${CI_COMMIT_SHORT_SHA}"

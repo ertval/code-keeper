@@ -8,9 +8,17 @@
 
   vars:
     gitlab_runner_url: "{{ lookup('env', 'GITLAB_EXTERNAL_URL') | default('http://gitlab.example.com', true) }}"
-    gitlab_runner_registration_token: "{{ lookup('env', 'GITLAB_RUNNER_TOKEN') | default('glrt-mock-runner-token-12345', true) }}"
+    gitlab_runner_registration_token: "{{ lookup('env', 'GITLAB_RUNNER_TOKEN') }}"
     gitlab_runner_executor: "docker"
     gitlab_runner_default_image: "docker:24.0.5"
+
+  pre_tasks:
+    - name: Fail when GitLab runner token is not provided
+      ansible.builtin.assert:
+        that:
+          - gitlab_runner_registration_token is defined
+          - gitlab_runner_registration_token | length > 0
+        fail_msg: "GITLAB_RUNNER_TOKEN env var (CI masked variable) must be set; no default token is committed."
 
   roles:
     - role: gitlab_runner
