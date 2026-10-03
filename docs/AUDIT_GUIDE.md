@@ -1,17 +1,17 @@
 # Code-Keeper: Comprehensive Audit Defense & Stakeholder Simulation Guide
 
 > **Document Classification**: Master Audit Preparation, Technical Defense, and Stakeholder Simulation Manual  
-> **Target Project**: [`code-keeper`](file:///home/ertval/code/zone-modules/code-keeper)  
-> **Source Criteria**: [`audit.md`](file:///home/ertval/code/zone-modules/code-keeper/audit.md) & [`README.md`](file:///home/ertval/code/zone-modules/code-keeper/README.md)  
+> **Target Project**: [`code-keeper`](..)  
+> **Source Criteria**: [`docs/readme.md`](readme.md) (01-edu subject requirements) & [`docs/audit.md`](audit.md) & [`README.md`](../README.md) (implementation documentation)  
 > **Primary Audience**: DevOps Engineers, Auditors, Technical Leads, and System Evaluators  
 
 ---
 
 ## Executive Summary & Audit Overview
 
-`code-keeper` represents a production-grade enterprise DevOps platform and automated CI/CD microservices architecture. It combines automated server configuration management ([Ansible](file:///home/ertval/code/zone-modules/code-keeper/ansible)), Infrastructure as Code ([Terraform](file:///home/ertval/code/zone-modules/code-keeper/infra)), continuous integration/continuous delivery ([GitLab CI/CD](file:///home/ertval/code/zone-modules/code-keeper/infra/.gitlab-ci.yml)), and defense-in-depth cybersecurity controls across dual staging and production cloud environments on AWS.
+`code-keeper` represents a production-grade enterprise DevOps platform and automated CI/CD microservices architecture. It combines automated server configuration management ([Ansible](../ansible)), Infrastructure as Code ([Terraform](../infra)), continuous integration/continuous delivery ([GitLab CI/CD](../infra/.gitlab-ci.yml)), and defense-in-depth cybersecurity controls across dual staging and production cloud environments on AWS.
 
-This guide is structured to walk the student or auditor through every evaluation milestone in [`audit.md`](file:///home/ertval/code/zone-modules/code-keeper/audit.md) in exact chronological order:
+This guide is structured to walk the student or auditor through every evaluation milestone in [`docs/audit.md`](audit.md) in exact chronological order:
 1. **General Repository Content Verification**
 2. **Stakeholder Roleplay Simulation (16 Exhaustive Interview Answers + Critical Thinking Defense)**
 3. **GitLab CE & Runners Deployment Review (Ansible Automation & System Inspection)**
@@ -83,13 +83,13 @@ This guide is structured to walk the student or auditor through every evaluation
 
 ### 1.1 Required Artifacts Checklist
 
-According to [`audit.md`](file:///home/ertval/code/zone-modules/code-keeper/audit.md#L3-L12), the repository must contain three core artifact categories:
+According to [`docs/audit.md`](audit.md#L3-L12), the repository must contain three core artifact categories:
 
 | Artifact Category | Required Items | Implemented Path in `code-keeper` | Status |
 |---|---|---|---|
-| **1. CI/CD Pipeline Configuration Files, Scripts, and Artifacts** | Infrastructure 6-stage pipeline, microservice 7-stage pipelines, container build manifests, testing scripts | [`infra/.gitlab-ci.yml`](file:///home/ertval/code/zone-modules/code-keeper/infra/.gitlab-ci.yml)<br>[`api-gateway/.gitlab-ci.yml`](file:///home/ertval/code/zone-modules/code-keeper/api-gateway/.gitlab-ci.yml)<br>[`inventory-app/.gitlab-ci.yml`](file:///home/ertval/code/zone-modules/code-keeper/inventory-app/.gitlab-ci.yml)<br>[`billing-app/.gitlab-ci.yml`](file:///home/ertval/code/zone-modules/code-keeper/billing-app/.gitlab-ci.yml)<br>[`scripts/test_pipelines.sh`](file:///home/ertval/code/zone-modules/code-keeper/scripts/test_pipelines.sh)<br>[`scripts/verify_security.sh`](file:///home/ertval/code/zone-modules/code-keeper/scripts/verify_security.sh) | **100% Present & Verified** |
-| **2. Ansible Playbooks & Scripts for Deploying & Configuring GitLab** | Playbook for GitLab CE omnibus, Playbook for GitLab Runner Docker executor, inventory, execution wrappers | [`ansible/playbooks/deploy-gitlab.yml`](file:///home/ertval/code/zone-modules/code-keeper/ansible/playbooks/deploy-gitlab.yml)<br>[`ansible/playbooks/deploy-runners.yml`](file:///home/ertval/code/zone-modules/code-keeper/ansible/playbooks/deploy-runners.yml)<br>[`ansible/inventory/hosts.ini`](file:///home/ertval/code/zone-modules/code-keeper/ansible/inventory/hosts.ini)<br>[`ansible/roles/gitlab/`](file:///home/ertval/code/zone-modules/code-keeper/ansible/roles/gitlab)<br>[`ansible/roles/gitlab_runner/`](file:///home/ertval/code/zone-modules/code-keeper/ansible/roles/gitlab_runner)<br>[`ansible/scripts/setup-gitlab.sh`](file:///home/ertval/code/zone-modules/code-keeper/ansible/scripts/setup-gitlab.sh)<br>[`ansible/scripts/register-runner.sh`](file:///home/ertval/code/zone-modules/code-keeper/ansible/scripts/register-runner.sh) | **100% Present & Verified** |
-| **3. Well-Documented README.md** | Pipeline design, architectural diagrams, tools used, setup instructions, security controls | [`README.md`](file:///home/ertval/code/zone-modules/code-keeper/README.md) (434 lines, comprehensive Markdown, ASCII topology, tables, roleplay answers) | **100% Present & Verified** |
+| **1. CI/CD Pipeline Configuration Files, Scripts, and Artifacts** | Infrastructure 6-stage pipeline, microservice 7-stage pipelines, container build manifests, testing scripts | [`infra/.gitlab-ci.yml`](../infra/.gitlab-ci.yml)<br>[`srcs/api-gateway/.gitlab-ci.yml`](../srcs/api-gateway/.gitlab-ci.yml)<br>[`srcs/inventory-app/.gitlab-ci.yml`](../srcs/inventory-app/.gitlab-ci.yml)<br>[`srcs/billing-app/.gitlab-ci.yml`](../srcs/billing-app/.gitlab-ci.yml)<br>[`scripts/test_pipelines.sh`](../scripts/test_pipelines.sh)<br>[`scripts/verify_security.sh`](../scripts/verify_security.sh) | **100% Present & Verified** |
+| **2. Ansible Playbooks & Scripts for Deploying & Configuring GitLab** | Playbook for GitLab CE omnibus, Playbook for GitLab Runner Docker executor, inventory, execution wrappers | [`ansible/playbooks/deploy-gitlab.yml`](../ansible/playbooks/deploy-gitlab.yml)<br>[`ansible/playbooks/deploy-runners.yml`](../ansible/playbooks/deploy-runners.yml)<br>[`ansible/inventory/hosts.ini`](../ansible/inventory/hosts.ini)<br>[`ansible/roles/gitlab/`](../ansible/roles/gitlab)<br>[`ansible/roles/gitlab_runner/`](../ansible/roles/gitlab_runner)<br>[`ansible/scripts/setup-gitlab.sh`](../ansible/scripts/setup-gitlab.sh)<br>[`ansible/scripts/register-runner.sh`](../ansible/scripts/register-runner.sh) | **100% Present & Verified** |
+| **3. Well-Documented README.md** | Pipeline design, architectural diagrams, tools used, setup instructions, security controls | [`README.md`](../README.md) (434 lines, comprehensive Markdown, ASCII topology, tables, roleplay answers) | **100% Present & Verified** |
 
 ### 1.2 Comprehensive File Inventory
 
@@ -151,46 +151,52 @@ code-keeper/
 │       ├── rabbitmq/                          # Amazon MQ RabbitMQ messaging broker
 │       └── compute/                           # Public ALB, ECS Fargate Cluster, Tasks & Services
 │
-├── api-gateway/                               # Microservice 1: Reverse Proxy & Ingress
-│   ├── .gitlab-ci.yml                         # 7-Stage Microservice CI/CD Pipeline
-│   ├── Dockerfile                             # Hardened Alpine image (USER appuser 10001)
-│   ├── requirements.txt                       # Python dependencies (Flask, Waitress, Pika)
-│   ├── server.py                              # Production WSGI server entrypoint
-│   ├── openapi.yaml                           # OpenAPI 3.0 specification
-│   ├── app/
-│   │   ├── __init__.py                        # Flask application factory & health endpoints
-│   │   ├── proxy.py                           # HTTP proxy forwarder to inventory microservice
-│   │   └── queue_sender.py                    # AMQP publisher pushing orders to RabbitMQ
-│   └── tests/
-│       └── test_gateway.py                    # Gateway routing and error-handling unit tests
+├── srcs/                                      # Microservice Application Source Code
+│   ├── api-gateway/                           # Microservice 1: Reverse Proxy & Ingress
+│   │   ├── .gitlab-ci.yml                     # 7-Stage Microservice CI/CD Pipeline
+│   │   ├── Dockerfile                         # Hardened Alpine image (USER appuser 10001)
+│   │   ├── requirements.txt                   # Python dependencies (Flask, Waitress, Pika)
+│   │   ├── server.py                          # Production WSGI server entrypoint
+│   │   ├── openapi.yaml                       # OpenAPI 3.0 specification
+│   │   ├── app/
+│   │   │   ├── __init__.py                    # Flask application factory & health endpoints
+│   │   │   ├── proxy.py                       # HTTP proxy forwarder to inventory microservice
+│   │   │   └── queue_sender.py                # AMQP publisher pushing orders to RabbitMQ
+│   │   └── tests/
+│   │       └── test_gateway.py                # Gateway routing and error-handling unit tests
+│   │
+│   ├── inventory-app/                         # Microservice 2: Movie Catalog & Inventory CRUD
+│   │   ├── .gitlab-ci.yml                     # 7-Stage Microservice CI/CD Pipeline
+│   │   ├── Dockerfile                         # Hardened Alpine image (USER appuser 10001)
+│   │   ├── requirements.txt                   # Python dependencies (Flask, SQLAlchemy, psycopg2)
+│   │   ├── server.py                          # Production WSGI server entrypoint
+│   │   ├── app/
+│   │   │   ├── __init__.py                    # Flask application factory & DB initialization
+│   │   │   ├── extensions.py                  # SQLAlchemy instance declaration
+│   │   │   └── movies.py                      # REST CRUD controllers & Movie database model
+│   │   └── tests/
+│   │       └── test_inventory.py              # Database CRUD and model validation tests
+│   │
+│   └── billing-app/                           # Microservice 3: Async Orders Worker & Billing CRUD
+│       ├── .gitlab-ci.yml                     # 7-Stage Microservice CI/CD Pipeline
+│       ├── Dockerfile                         # Hardened Alpine image (USER appuser 10001)
+│       ├── requirements.txt                   # Python dependencies (Flask, SQLAlchemy, Pika)
+│       ├── server.py                          # Production WSGI server entrypoint
+│       ├── app/
+│       │   ├── __init__.py                    # Flask app factory, healthcheck, DB setup
+│       │   ├── consume_queue.py               # AMQP consumer worker reading billing_queue
+│       │   └── orders.py                      # Order models & REST transaction endpoints
+│       └── tests/
+│           └── test_billing.py                # Worker parsing, order creation, and unit tests
 │
-├── inventory-app/                             # Microservice 2: Movie Catalog & Inventory CRUD
-│   ├── .gitlab-ci.yml                         # 7-Stage Microservice CI/CD Pipeline
-│   ├── Dockerfile                             # Hardened Alpine image (USER appuser 10001)
-│   ├── requirements.txt                       # Python dependencies (Flask, SQLAlchemy, psycopg2)
-│   ├── server.py                              # Production WSGI server entrypoint
-│   ├── app/
-│   │   ├── __init__.py                        # Flask application factory & DB initialization
-│   │   ├── extensions.py                      # SQLAlchemy instance declaration
-│   │   └── movies.py                          # REST CRUD controllers & Movie database model
-│   └── tests/
-│       └── test_inventory.py                  # Database CRUD and model validation tests
+├── scripts/                                   # Audit & Compliance Verification Test Suites
+│   ├── test_pipelines.sh                      # 11-test suite validating YAML, syntax, tests, formatting
+│   └── verify_security.sh                     # 4-guideline cybersecurity audit verification script
 │
-├── billing-app/                               # Microservice 3: Async Orders Worker & Billing CRUD
-│   ├── .gitlab-ci.yml                         # 7-Stage Microservice CI/CD Pipeline
-│   ├── Dockerfile                             # Hardened Alpine image (USER appuser 10001)
-│   ├── requirements.txt                       # Python dependencies (Flask, SQLAlchemy, Pika)
-│   ├── server.py                              # Production WSGI server entrypoint
-│   ├── app/
-│   │   ├── __init__.py                        # Flask app factory, healthcheck, DB setup
-│   │   ├── consume_queue.py                   # AMQP consumer worker reading billing_queue
-│   │   └── orders.py                          # Order models & REST transaction endpoints
-│   └── tests/
-│       └── test_billing.py                    # Worker parsing, order creation, and unit tests
-│
-└── scripts/                                   # Audit & Compliance Verification Test Suites
-    ├── test_pipelines.sh                      # 11-test suite validating YAML, syntax, tests, formatting
-    └── verify_security.sh                     # 4-guideline cybersecurity audit verification script
+└── docs/                                      # Project Requirements & Audit Documentation
+    ├── readme.md                              # 01-edu subject requirements (source of truth)
+    ├── audit.md                               # Auditor rubric and evaluation checklist
+    └── AUDIT_GUIDE.md                         # This audit defense manual
 ```
 
 ### 1.3 Audit Verdict: Are All Required Files Present?
@@ -252,8 +258,8 @@ Below are exhaustive, word-for-word answers designed to impress any auditor. Eac
 **Verbatim Model Answer**:
 > *"DevOps improves collaboration by creating a shared operational reality and aligning metrics across teams:*  
 > 1. **Single Source of Truth in Version Control**: Both application code and infrastructure configurations live in Git repositories. Developers and operations engineers review each other's merge requests, participate in code reviews, and maintain complete visibility into infrastructure state.  
-> 2. **Environment Parity via Containers**: By packaging our microservices into standard Docker containers using [`api-gateway/Dockerfile`](file:///home/ertval/code/zone-modules/code-keeper/api-gateway/Dockerfile), [`inventory-app/Dockerfile`](file:///home/ertval/code/zone-modules/code-keeper/inventory-app/Dockerfile), and [`billing-app/Dockerfile`](file:///home/ertval/code/zone-modules/code-keeper/billing-app/Dockerfile), developers run the exact same runtime environment locally that operations deploys to AWS ECS Fargate. The infamous excuse 'it worked on my machine' is eradicated.  
-> 3. **Shared Tooling and Language**: Operations engineers write declarative Terraform code ([`infra/modules/`](file:///home/ertval/code/zone-modules/code-keeper/infra/modules)) and Ansible playbooks ([`ansible/playbooks/`](file:///home/ertval/code/zone-modules/code-keeper/ansible/playbooks)) using the same Git workflows, linting, and CI pipelines that developers use for Python code.  
+> 2. **Environment Parity via Containers**: By packaging our microservices into standard Docker containers using [`srcs/api-gateway/Dockerfile`](../srcs/api-gateway/Dockerfile), [`srcs/inventory-app/Dockerfile`](../srcs/inventory-app/Dockerfile), and [`srcs/billing-app/Dockerfile`](../srcs/billing-app/Dockerfile), developers run the exact same runtime environment locally that operations deploys to AWS ECS Fargate. The infamous excuse 'it worked on my machine' is eradicated.  
+> 3. **Shared Tooling and Language**: Operations engineers write declarative Terraform code ([`infra/modules/`](../infra/modules)) and Ansible playbooks ([`ansible/playbooks/`](../ansible/playbooks)) using the same Git workflows, linting, and CI pipelines that developers use for Python code.  
 > 4. **Blameless Culture and Shared Responsibility**: When a build fails in the pipeline, the automated logs from GitLab Runner identify the exact stage—whether a unit test failure, a Trivy security vulnerability, or a Terraform syntax error—fostering immediate cross-functional problem solving rather than finger-pointing."*
 
 ---
@@ -264,8 +270,8 @@ Below are exhaustive, word-for-word answers designed to impress any auditor. Eac
 > *"In `code-keeper`, we incorporated five foundational DevOps practices:*  
 > 1. **Continuous Integration (CI)**: On every commit, our microservice pipelines automatically install dependencies, compile bytecode (`python3 -m compileall -b .`), execute unit tests with coverage reporting via `pytest`, and execute static analysis.  
 > 2. **Continuous Delivery / Deployment (CD)**: Upon merging to `main`, applications are automatically deployed to our staging environment on AWS ECS, followed by an automated smoke test. A manual approval gate ensures stakeholder sign-off before a zero-downtime rolling update is pushed to production.  
-> 3. **Infrastructure as Code (IaC)**: We provisioned our VPC, subnets, routing tables, security groups, RDS PostgreSQL databases, RabbitMQ broker, and ECS clusters using modular Terraform in [`infra/`](file:///home/ertval/code/zone-modules/code-keeper/infra).  
-> 4. **Configuration Management**: We automated the installation, system tuning, and CI/CD security settings of GitLab Community Edition and GitLab Runners using Ansible playbooks in [`ansible/playbooks/`](file:///home/ertval/code/zone-modules/code-keeper/ansible/playbooks).  
+> 3. **Infrastructure as Code (IaC)**: We provisioned our VPC, subnets, routing tables, security groups, RDS PostgreSQL databases, RabbitMQ broker, and ECS clusters using modular Terraform in [`infra/`](../infra).  
+> 4. **Configuration Management**: We automated the installation, system tuning, and CI/CD security settings of GitLab Community Edition and GitLab Runners using Ansible playbooks in [`ansible/playbooks/`](../ansible/playbooks).  
 > 5. **DevSecOps (Shift-Left Security)**: We embedded automated security scanners directly into the pipeline: Bandit for Python AST security analysis, Gitleaks for secret detection, and Trivy for filesystem and container layer CVE scanning."*
 
 ---
@@ -305,7 +311,7 @@ Below are exhaustive, word-for-word answers designed to impress any auditor. Eac
 >  
 > *The importance of IaC in `code-keeper` is demonstrated by:*  
 > 1. **Complete Elimination of Configuration Drift**: Manual changes are forbidden. The infrastructure state stored in Terraform state files reflects reality. Any drift is identified during `terraform plan` and corrected upon apply.  
-> 2. **Environment Parity**: In [`infra/environments/staging`](file:///home/ertval/code/zone-modules/code-keeper/infra/environments/staging) and [`infra/environments/production`](file:///home/ertval/code/zone-modules/code-keeper/infra/environments/production), both environments invoke the exact same reusable modules ([`vpc`](file:///home/ertval/code/zone-modules/code-keeper/infra/modules/vpc), [`security_groups`](file:///home/ertval/code/zone-modules/code-keeper/infra/modules/security_groups), [`rds`](file:///home/ertval/code/zone-modules/code-keeper/infra/modules/rds), [`rabbitmq`](file:///home/ertval/code/zone-modules/code-keeper/infra/modules/rabbitmq), [`compute`](file:///home/ertval/code/zone-modules/code-keeper/infra/modules/compute)). Staging is an architectural replica of production.  
+> 2. **Environment Parity**: In [`infra/environments/staging`](../infra/environments/staging) and [`infra/environments/production`](../infra/environments/production), both environments invoke the exact same reusable modules ([`vpc`](../infra/modules/vpc), [`security_groups`](../infra/modules/security_groups), [`rds`](../infra/modules/rds), [`rabbitmq`](../infra/modules/rabbitmq), [`compute`](../infra/modules/compute)). Staging is an architectural replica of production.  
 > 3. **Version Control and Auditability**: Every network change, firewall rule adjustment, or database sizing change is tracked through Git commits, complete with author metadata and commit rationale.  
 > 4. **Disaster Recovery and Reproducibility**: If an entire AWS region were lost, executing our 6-stage infrastructure pipeline would rebuild the entire VPC, database clusters, messaging broker, and containerized microservices in that region deterministically in under 15 minutes."*
 
@@ -334,7 +340,7 @@ Below are exhaustive, word-for-word answers designed to impress any auditor. Eac
 >  
 > 1. **Challenge 1: Zero-Downtime Deployments on ECS Fargate**:  
 >    *Problem*: Initial container updates risked service interruption if old containers were terminated before new containers passed health checks.  
->    *Solution*: We configured ECS service deployment controls with `deployment_minimum_healthy_percent = 100` and `deployment_maximum_percent = 200` in [`infra/modules/compute/main.tf`](file:///home/ertval/code/zone-modules/code-keeper/infra/modules/compute/main.tf#L173-L174). AWS ECS spins up new container tasks alongside existing ones, verifies that HTTP `/health` probes return `200 OK` on the ALB target group, and only then begins draining and decommissioning the old tasks.  
+>    *Solution*: We configured ECS service deployment controls with `deployment_minimum_healthy_percent = 100` and `deployment_maximum_percent = 200` in [`infra/modules/compute/main.tf`](../infra/modules/compute/main.tf#L173-L174). AWS ECS spins up new container tasks alongside existing ones, verifies that HTTP `/health` probes return `200 OK` on the ALB target group, and only then begins draining and decommissioning the old tasks.  
 >  
 > 2. **Challenge 2: Balancing Environment Parity with Cloud Cost**:  
 >    *Problem*: Mirroring production in staging can lead to excessive AWS resource costs if multi-AZ databases and high-replica ECS clusters are duplicated identically.  
@@ -342,7 +348,7 @@ Below are exhaustive, word-for-word answers designed to impress any auditor. Eac
 >  
 > 3. **Challenge 3: Managing Credentials Securely in CI/CD**:  
 >    *Problem*: Pipelines require access to AWS and container registries to deploy resources, creating the risk of credential leakage in build logs.  
->    *Solution*: We strictly decoupled credentials from code. We configured AWS keys and registry tokens as **Masked & Protected Variables** in GitLab CI/CD settings, excluded local `.env` and `*.tfstate` files via [`.gitignore`](file:///home/ertval/code/zone-modules/code-keeper/.gitignore), and verified zero leaks using [`scripts/verify_security.sh`](file:///home/ertval/code/zone-modules/code-keeper/scripts/verify_security.sh)."*
+>    *Solution*: We strictly decoupled credentials from code. We configured AWS keys and registry tokens as **Masked & Protected Variables** in GitLab CI/CD settings, excluded local `.env` and `*.tfstate` files via [`.gitignore`](../.gitignore), and verified zero leaks using [`scripts/verify_security.sh`](../scripts/verify_security.sh)."*
 
 ---
 
@@ -362,9 +368,9 @@ Below are exhaustive, word-for-word answers designed to impress any auditor. Eac
 **Verbatim Model Answer**:
 > *"GitLab serves as a comprehensive, single-tenant DevOps platform that integrates source code management, issue tracking, container registry, and CI/CD orchestration into a unified control plane. Rather than gluing together disparate tools (such as Jenkins, GitHub, Artifactory, and Jira), GitLab provides native end-to-end traceability from commit to production deployment.*  
 >  
-> *GitLab Runners are the lightweight, scalable execution agents that run pipeline jobs. In `code-keeper`, we deployed GitLab Runners using the **Docker executor** via [`ansible/playbooks/deploy-runners.yml`](file:///home/ertval/code/zone-modules/code-keeper/ansible/playbooks/deploy-runners.yml). The key architectural benefits include:*  
+> *GitLab Runners are the lightweight, scalable execution agents that run pipeline jobs. In `code-keeper`, we deployed GitLab Runners using the **Docker executor** via [`ansible/playbooks/deploy-runners.yml`](../ansible/playbooks/deploy-runners.yml). The key architectural benefits include:*  
 > 1. **Hermetic Job Isolation**: Every pipeline stage runs in a clean, isolated Docker container (`python:3.11-alpine`, `hashicorp/terraform:1.6`, `docker:24.0.5`). No dependencies linger or pollute the host operating system.  
-> 2. **Scalability and Concurrency**: We configured the runner with `concurrent = 4` in [`ansible/roles/gitlab_runner/templates/config.toml.j2`](file:///home/ertval/code/zone-modules/code-keeper/ansible/roles/gitlab_runner/templates/config.toml.j2), enabling parallel execution of unit tests, security scans, and container builds across multiple repositories simultaneously.  
+> 2. **Scalability and Concurrency**: We configured the runner with `concurrent = 4` in [`ansible/roles/gitlab_runner/templates/config.toml.j2`](../ansible/roles/gitlab_runner/templates/config.toml.j2), enabling parallel execution of unit tests, security scans, and container builds across multiple repositories simultaneously.  
 > 3. **Secure Pipeline Gating**: The runner enforces branch protection rules and variable masking, ensuring unprivileged pull requests cannot access production deployment secrets."*
 
 ---
@@ -375,11 +381,11 @@ Below are exhaustive, word-for-word answers designed to impress any auditor. Eac
 > *"Ansible provides significant advantages over traditional configuration management tools (such as Chef, Puppet, or manual bash scripts):*  
 > 1. **Agentless Architecture**: Ansible operates entirely over standard OpenSSH and Python. There are no client-side background daemons or agents to install, patch, or monitor on target servers.  
 > 2. **Declarative and Idempotent Execution**: Ansible ensures that executing a playbook multiple times produces the exact same desired system state without side effects. If a package is already installed or a configuration file matches the template, Ansible marks the task as `ok` and takes no unnecessary action.  
-> 3. **Modularity via Roles**: In [`ansible/roles/`](file:///home/ertval/code/zone-modules/code-keeper/ansible/roles), we structured our automation into reusable roles: `gitlab` and `gitlab_runner`. Each role encapsulates its own defaults, tasks, templates, and handlers.  
+> 3. **Modularity via Roles**: In [`ansible/roles/`](../ansible/roles), we structured our automation into reusable roles: `gitlab` and `gitlab_runner`. Each role encapsulates its own defaults, tasks, templates, and handlers.  
 >  
 > *In `code-keeper`, Ansible streamlined our deployment by:*  
 > - Fully installing the GitLab CE omnibus package, rendering `/etc/gitlab/gitlab.rb` with production Puma workers and memory tuning, and executing `gitlab-ctl reconfigure` automatically.  
-> - Executing a custom Rails runner task in [`ansible/roles/gitlab/tasks/cicd.yml`](file:///home/ertval/code/zone-modules/code-keeper/ansible/roles/gitlab/tasks/cicd.yml) that automatically enables strict branch protection (`default_branch_protection: 2`) and disables public sign-ups.  
+> - Executing a custom Rails runner task in [`ansible/roles/gitlab/tasks/cicd.yml`](../ansible/roles/gitlab/tasks/cicd.yml) that automatically enables strict branch protection (`default_branch_protection: 2`) and disables public sign-ups.  
 > - Installing Docker Engine, registering the GitLab Runner non-interactively with tags, and launching the systemd service in under three minutes."*
 
 ---
@@ -390,13 +396,13 @@ Below are exhaustive, word-for-word answers designed to impress any auditor. Eac
 > *"Infrastructure as Code (IaC) allows cloud infrastructure to be provisioned, updated, and versioned using human-readable configuration files. Terraform implements IaC through a declarative language (HashiCorp Configuration Language - HCL). Instead of imperatively scripting 'create a subnet, then wait, then create a route table', we declare the desired end-state, and Terraform's core engine resolves the dependency graph and executes the minimal set of API calls required to achieve that state.*  
 >  
 > *In `code-keeper`, we structured our Terraform architecture into a two-tier modular hierarchy:*  
-> 1. **Reusable Foundation Modules ([`infra/modules/`](file:///home/ertval/code/zone-modules/code-keeper/infra/modules))**:  
+> 1. **Reusable Foundation Modules ([`infra/modules/`](../infra/modules))**:  
 >    - `vpc`: Defines a custom VPC with multi-AZ public and private subnets, Internet Gateways, and NAT Gateways.  
 >    - `security_groups`: Codifies least-privilege firewall rules separating public ALB traffic from private microservices and database ports.  
 >    - `rds`: Provisions managed PostgreSQL databases with automated backups, parameter groups, and encrypted storage.  
 >    - `rabbitmq`: Provisions a managed Amazon MQ RabbitMQ messaging broker.  
 >    - `compute`: Configures the public Application Load Balancer, target groups, ECS Fargate Cluster, task definitions, and rolling deployment services.  
-> 2. **Environment Roots ([`infra/environments/`](file:///home/ertval/code/zone-modules/code-keeper/infra/environments))**:  
+> 2. **Environment Roots ([`infra/environments/`](../infra/environments))**:  
 >    - We instantiated two independent roots: `staging` (VPC `10.10.0.0/16`) and `production` (VPC `10.20.0.0/16`). Both environments consume the exact same underlying modules, guaranteeing identical architecture while allowing environment-specific sizing and cost controls via `terraform.tfvars`."*
 
 ---
@@ -481,7 +487,7 @@ Below are exhaustive, word-for-word answers designed to impress any auditor. Eac
 
 ### 2.3 Addressing Stakeholder Evaluation Criteria
 
-In accordance with [`audit.md`](file:///home/ertval/code/zone-modules/code-keeper/audit.md#L51-L56), the auditor evaluates the team on three core competencies:
+In accordance with [`docs/audit.md`](audit.md#L51-L56), the auditor evaluates the team on three core competencies:
 
 #### 1. Do all of the students have a good understanding of the concepts and technologies used in the project?
 - **Auditor Defense Summary**: The student demonstrates mastery across all five core technologies: **Ansible** (roles, idempotency, templates, Rails runner automation), **Terraform** (providers, state locks, modular hierarchy, dynamic plans), **Docker** (multi-stage builds, non-root user enforcement, layer caching), **GitLab CI/CD** (stages, runner tags, Docker executor, DAG `needs:` dependencies, artifact expiration), and **AWS Cloud Architecture** (VPC, private subnets, security groups, Application Load Balancers, ECS Fargate, RDS PostgreSQL, Amazon MQ RabbitMQ).
@@ -506,7 +512,7 @@ In accordance with [`audit.md`](file:///home/ertval/code/zone-modules/code-keepe
 
 ### 3.1 Demonstrating Ansible Playbooks to the Auditor
 
-[`audit.md`](file:///home/ertval/code/zone-modules/code-keeper/audit.md#L57) requires the auditee **to show the auditor** the use of `ansible-playbook --list-tasks` and service inspection commands.
+[`docs/audit.md`](audit.md#L57) requires the auditee **to show the auditor** the use of `ansible-playbook --list-tasks` and service inspection commands.
 
 #### Playbook 1: GitLab CE Deployment
 Execute:
@@ -592,12 +598,12 @@ systemctl status gitlab-runner
 > **Auditor Question**: *Was the GitLab instance deployed and configured successfully using Ansible?*  
 > **Verdict**: **YES, COMPLETELY DEPLOYED & HARDENED.**  
 > **Technical Explanation**:  
-> The role [`ansible/roles/gitlab`](file:///home/ertval/code/zone-modules/code-keeper/ansible/roles/gitlab) performs an end-to-end automated deployment:
+> The role [`ansible/roles/gitlab`](../ansible/roles/gitlab) performs an end-to-end automated deployment:
 > 1. Installs OS dependencies (`curl`, `openssh-server`, `ca-certificates`, `tzdata`, `perl`).
 > 2. Adds the official GitLab CE repository and installs the package.
-> 3. Renders `/etc/gitlab/gitlab.rb` via Jinja2 template [`gitlab.rb.j2`](file:///home/ertval/code/zone-modules/code-keeper/ansible/roles/gitlab/templates/gitlab.rb.j2) with external URLs, Puma workers, and memory tuning.
+> 3. Renders `/etc/gitlab/gitlab.rb` via Jinja2 template [`gitlab.rb.j2`](../ansible/roles/gitlab/templates/gitlab.rb.j2) with external URLs, Puma workers, and memory tuning.
 > 4. Automatically triggers `gitlab-ctl reconfigure` via an Ansible handler.
-> 5. Executes [`cicd.yml`](file:///home/ertval/code/zone-modules/code-keeper/ansible/roles/gitlab/tasks/cicd.yml) which runs `gitlab-rails runner` to programmatically disable public sign-ups (`signup_enabled: false`) and enforce strict branch protection (`default_branch_protection: 2`).
+> 5. Executes [`cicd.yml`](../ansible/roles/gitlab/tasks/cicd.yml) which runs `gitlab-rails runner` to programmatically disable public sign-ups (`signup_enabled: false`) and enforce strict branch protection (`default_branch_protection: 2`).
 
 ---
 
@@ -606,10 +612,10 @@ systemctl status gitlab-runner
 > **Auditor Question**: *Are the GitLab Runners integrated with the existing pipeline and executing tasks as expected for all repositories?*  
 > **Verdict**: **YES, INTEGRATED WITH DOCKER EXECUTOR & MULTI-REPO SUPPORT.**  
 > **Technical Explanation**:  
-> The role [`ansible/roles/gitlab_runner`](file:///home/ertval/code/zone-modules/code-keeper/ansible/roles/gitlab_runner):
+> The role [`ansible/roles/gitlab_runner`](../ansible/roles/gitlab_runner):
 > 1. Installs Docker Engine (`docker-ce`) and the `gitlab-runner` daemon.
 > 2. Adds `gitlab-runner` to the `docker` OS group so it can manage containers without root escalation.
-> 3. Executes non-interactive registration via [`register.yml`](file:///home/ertval/code/zone-modules/code-keeper/ansible/roles/gitlab_runner/tasks/register.yml) configuring:
+> 3. Executes non-interactive registration via [`register.yml`](../ansible/roles/gitlab_runner/tasks/register.yml) configuring:
 >    - `--executor docker`
 >    - `--docker-image docker:24.0.5`
 >    - `--docker-volumes /var/run/docker.sock:/var/run/docker.sock` (enables Docker build and Trivy image scanning)
@@ -623,7 +629,7 @@ systemctl status gitlab-runner
 
 ### 4.1 Cloud Infrastructure Parity & Architecture Overview
 
-The infrastructure in [`infra/`](file:///home/ertval/code/zone-modules/code-keeper/infra) provisions the architecture of `cloud-design` and hosts `crud-master` microservices across two fully isolated environments on AWS: `staging` and `production`.
+The infrastructure in [`infra/`](../infra) provisions the architecture of `cloud-design` and hosts `crud-master` microservices across two fully isolated environments on AWS: `staging` and `production`.
 
 #### Infrastructure Architecture Diagram
 ```
@@ -664,12 +670,12 @@ The infrastructure in [`infra/`](file:///home/ertval/code/zone-modules/code-keep
 
 #### Dual-Environment Parity Comparison Matrix
 
-| Architectural Feature | Staging Environment ([`staging/`](file:///home/ertval/code/zone-modules/code-keeper/infra/environments/staging)) | Production Environment ([`production/`](file:///home/ertval/code/zone-modules/code-keeper/infra/environments/production)) | Parity & Rationale |
+| Architectural Feature | Staging Environment ([`staging/`](../infra/environments/staging)) | Production Environment ([`production/`](../infra/environments/production)) | Parity & Rationale |
 |---|---|---|---|
 | **VPC CIDR Block** | `10.10.0.0/16` | `10.20.0.0/16` | Non-overlapping CIDRs; identical subnet tier design |
 | **Availability Zones**| `us-east-1a`, `us-east-1b` | `us-east-1a`, `us-east-1b` | Strict parity: multi-AZ subnet distribution |
 | **Subnet Tiers** | Public, Private, Database | Public, Private, Database | Strict parity: 3-tier network topology |
-| **Security Groups** | [`modules/security_groups`](file:///home/ertval/code/zone-modules/code-keeper/infra/modules/security_groups) | [`modules/security_groups`](file:///home/ertval/code/zone-modules/code-keeper/infra/modules/security_groups) | Identical least-privilege firewall definitions |
+| **Security Groups** | [`modules/security_groups`](../infra/modules/security_groups) | [`modules/security_groups`](../infra/modules/security_groups) | Identical least-privilege firewall definitions |
 | **RDS PostgreSQL** | `db.t3.micro`, 20GB, Single-AZ | `db.t3.small`, 50GB, Multi-AZ | Architecture parity; cost-optimized in staging, resilient in prod |
 | **RabbitMQ Broker** | `mq.t3.micro`, Single Instance | `mq.m5.large`, Multi-AZ Cluster | Architecture parity; burstable in staging, high-throughput in prod |
 | **ECS Compute** | Fargate (2 replicas per svc) | Fargate (4 replicas per svc) | Architecture parity; scales to absorb real production traffic |
@@ -679,13 +685,13 @@ The infrastructure in [`infra/`](file:///home/ertval/code/zone-modules/code-keep
 
 ### 4.2 Independent Infrastructure Repository Architecture
 
-The infrastructure configuration exists as an independent, modular codebase under [`infra/`](file:///home/ertval/code/zone-modules/code-keeper/infra), governed by its own independent pipeline file [`infra/.gitlab-ci.yml`](file:///home/ertval/code/zone-modules/code-keeper/infra/.gitlab-ci.yml). This cleanly decouples infrastructure changes from microservice application code merges.
+The infrastructure configuration exists as an independent, modular codebase under [`infra/`](../infra), governed by its own independent pipeline file [`infra/.gitlab-ci.yml`](../infra/.gitlab-ci.yml). This cleanly decouples infrastructure changes from microservice application code merges.
 
 ---
 
 ### 4.3 Walkthrough of the 6-Stage Infrastructure Pipeline
 
-[`infra/.gitlab-ci.yml`](file:///home/ertval/code/zone-modules/code-keeper/infra/.gitlab-ci.yml) implements the required 6 stages:
+[`infra/.gitlab-ci.yml`](../infra/.gitlab-ci.yml) implements the required 6 stages:
 
 ```
 [Stage 1: Init] ──► [Stage 2: Validate] ──► [Stage 3: Plan] ──► [Stage 4: Apply Staging] ──► [Stage 5: Approval] ──► [Stage 6: Apply Production]
@@ -723,7 +729,7 @@ The infrastructure configuration exists as an independent, modular codebase unde
 > 2. *Are the two environments similar in design, resources and services used?*  
 >    **Verdict**: **YES**. Both environments share 100% architectural parity, consuming the exact same Terraform modules with environment-specific sizing variables.
 > 3. *Does the student's infrastructure configuration exist in an independent repository with a configured pipeline?*  
->    **Verdict**: **YES**. Located in [`infra/`](file:///home/ertval/code/zone-modules/code-keeper/infra) with a standalone [`infra/.gitlab-ci.yml`](file:///home/ertval/code/zone-modules/code-keeper/infra/.gitlab-ci.yml).
+>    **Verdict**: **YES**. Located in [`infra/`](../infra) with a standalone [`infra/.gitlab-ci.yml`](../infra/.gitlab-ci.yml).
 > 4. *Are the "Init", "Validate", "Plan", "Apply to Staging", "Approval", and "Apply to production environment" stages implemented correctly in the infrastructure pipeline?*  
 >    **Verdict**: **YES**. All 6 stages exist verbatim and are verified by `./scripts/test_pipelines.sh`.
 
@@ -767,11 +773,11 @@ The Continuous Integration (CI) process spans the first 4 stages of each microse
 
 ### 5.2 Repository-by-Repository Implementation
 
-- **API Gateway ([`api-gateway/.gitlab-ci.yml`](file:///home/ertval/code/zone-modules/code-keeper/api-gateway/.gitlab-ci.yml))**:
+- **API Gateway ([`srcs/api-gateway/.gitlab-ci.yml`](../srcs/api-gateway/.gitlab-ci.yml))**:
   Validates Flask reverse proxy, OpenAPI 3.0 schema generation, and RabbitMQ producer logic.
-- **Inventory App ([`inventory-app/.gitlab-ci.yml`](file:///home/ertval/code/zone-modules/code-keeper/inventory-app/.gitlab-ci.yml))**:
+- **Inventory App ([`srcs/inventory-app/.gitlab-ci.yml`](../srcs/inventory-app/.gitlab-ci.yml))**:
   Validates SQLAlchemy models, PostgreSQL connection pooling, and RESTful movie catalog CRUD operations.
-- **Billing App ([`billing-app/.gitlab-ci.yml`](file:///home/ertval/code/zone-modules/code-keeper/billing-app/.gitlab-ci.yml))**:
+- **Billing App ([`srcs/billing-app/.gitlab-ci.yml`](../srcs/billing-app/.gitlab-ci.yml))**:
   Validates AMQP consumer worker logic, order processing transactions, and billing database records.
 
 ---
@@ -818,7 +824,7 @@ The Continuous Deployment (CD) process governs stages 5 through 7 of the microse
 
 ### 6.2 Zero-Downtime Rolling Updates & Gating
 
-In [`infra/modules/compute/main.tf`](file:///home/ertval/code/zone-modules/code-keeper/infra/modules/compute/main.tf#L173-L174), zero downtime is codified into the ECS service configuration:
+In [`infra/modules/compute/main.tf`](../infra/modules/compute/main.tf#L173-L174), zero downtime is codified into the ECS service configuration:
 ```hcl
 deployment_minimum_healthy_percent = 100
 deployment_maximum_percent         = 200
@@ -842,10 +848,10 @@ deployment_maximum_percent         = 200
 
 ## 7. Review Pipeline Functionality & Live Testing
 
-[`audit.md`](file:///home/ertval/code/zone-modules/code-keeper/audit.md#L90) specifies:
+[`docs/audit.md`](audit.md#L90) specifies:
 > *Review the functionality of pipelines. Ask the auditee **to show you**, the auditor, that the pipelines are functional by running one or several tests of their choosing.*
 
-To satisfy this requirement immediately, execute the two automated verification scripts located in [`scripts/`](file:///home/ertval/code/zone-modules/code-keeper/scripts).
+To satisfy this requirement immediately, execute the two automated verification scripts located in [`scripts/`](../scripts).
 
 ---
 
@@ -862,7 +868,7 @@ Run the full pipeline verification test suite:
 3. **Infrastructure Pipeline Stages**: Validates exact 6 stages (`Init`, `Validate`, `Plan`, `Apply to Staging`, `Approval`, `Apply to Production`).
 4. **Microservice Pipeline Stages**: Validates exact 7 stages (`Build`, `Test`, `Scan`, `Containerization`, `Deploy to Staging`, `Approval`, `Deploy to Production`) across all microservices.
 5. **Shell Script Syntax**: Runs `bash -n` across all setup and verification shell scripts.
-6. **Python Bytecode Compilation**: Executes `python3 -m compileall` across `api-gateway`, `inventory-app`, and `billing-app`.
+6. **Python Bytecode Compilation**: Executes `python3 -m compileall` across `srcs/api-gateway`, `srcs/inventory-app`, and `srcs/billing-app`.
 7. **Dockerfile Hardening**: Checks that all Dockerfiles enforce `USER appuser` and define a native `HEALTHCHECK` probe.
 8. **Terraform Parity**: Confirms both staging and production environments declare identical contract files (`main.tf`, `variables.tf`, `outputs.tf`, `terraform.tfvars`).
 9. **Terraform Formatting**: Executes `terraform fmt -check -recursive infra`.
@@ -918,16 +924,16 @@ Run the cybersecurity compliance audit script:
 
 ## 8. Cybersecurity Guidelines Verification
 
-[`audit.md`](file:///home/ertval/code/zone-modules/code-keeper/audit.md#L94-L111) outlines four mandatory cybersecurity pillars:
+[`docs/audit.md`](audit.md#L94-L111) outlines four mandatory cybersecurity pillars:
 
 ### 8.1 Guideline 1: Restrict Triggers to Protected Branches
 
-- **Pipeline Rules**: In all 4 pipeline configurations ([`infra/.gitlab-ci.yml`](file:///home/ertval/code/zone-modules/code-keeper/infra/.gitlab-ci.yml#L111-L113), [`api-gateway/.gitlab-ci.yml`](file:///home/ertval/code/zone-modules/code-keeper/api-gateway/.gitlab-ci.yml#L114-L116), [`inventory-app/.gitlab-ci.yml`](file:///home/ertval/code/zone-modules/code-keeper/inventory-app/.gitlab-ci.yml), [`billing-app/.gitlab-ci.yml`](file:///home/ertval/code/zone-modules/code-keeper/billing-app/.gitlab-ci.yml)), all deployment and gating jobs are locked to `main`:
+- **Pipeline Rules**: In all 4 pipeline configurations ([`infra/.gitlab-ci.yml`](../infra/.gitlab-ci.yml#L111-L113), [`srcs/api-gateway/.gitlab-ci.yml`](../srcs/api-gateway/.gitlab-ci.yml#L114-L116), [`srcs/inventory-app/.gitlab-ci.yml`](../srcs/inventory-app/.gitlab-ci.yml), [`srcs/billing-app/.gitlab-ci.yml`](../srcs/billing-app/.gitlab-ci.yml)), all deployment and gating jobs are locked to `main`:
   ```yaml
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
   ```
-- **GitLab Instance Enforcement**: In [`ansible/roles/gitlab/tasks/cicd.yml`](file:///home/ertval/code/zone-modules/code-keeper/ansible/roles/gitlab/tasks/cicd.yml#L8-L13), GitLab is configured via Rails runner:
+- **GitLab Instance Enforcement**: In [`ansible/roles/gitlab/tasks/cicd.yml`](../ansible/roles/gitlab/tasks/cicd.yml#L8-L13), GitLab is configured via Rails runner:
   ```ruby
   default_branch_protection_defaults: {
     'allowed_to_push' => [{'access_level' => Gitlab::Access::MAINTAINER}],
@@ -941,9 +947,9 @@ Run the cybersecurity compliance audit script:
 
 ### 8.2 Guideline 2: Separate Credentials from Code
 
-- **Zero Hardcoded Secrets**: Verified by [`scripts/verify_security.sh`](file:///home/ertval/code/zone-modules/code-keeper/scripts/verify_security.sh) (checks for AWS access keys `AKIA...`, RSA private keys, passwords).
+- **Zero Hardcoded Secrets**: Verified by [`scripts/verify_security.sh`](../scripts/verify_security.sh) (checks for AWS access keys `AKIA...`, RSA private keys, passwords).
 - **GitLab Masked & Protected Variables**: Production secrets (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `POSTGRES_PASSWORD`, `RABBITMQ_PASSWORD`, `CI_REGISTRY_PASSWORD`) are configured as **Masked** (scrubbed from job logs) and **Protected** (exposed only to jobs running on protected branches).
-- **Git Exclusion**: [`.gitignore`](file:///home/ertval/code/zone-modules/code-keeper/.gitignore) strictly excludes `.env`, `*.env.*`, `*.tfstate`, `*.tfstate.*`, `*.pem`, `*.key`, and build artifacts. Local environment files cannot be accidentally committed.
+- **Git Exclusion**: [`.gitignore`](../.gitignore) strictly excludes `.env`, `*.env.*`, `*.tfstate`, `*.tfstate.*`, `*.pem`, `*.key`, and build artifacts. Local environment files cannot be accidentally committed.
 
 ---
 
@@ -956,14 +962,14 @@ Run the cybersecurity compliance audit script:
   USER appuser
   ```
   If a container vulnerability is exploited, the attacker has no root privileges and cannot modify container binaries or escape to the host.
-- **Network Least Privilege**: In [`infra/modules/security_groups/main.tf`](file:///home/ertval/code/zone-modules/code-keeper/infra/modules/security_groups/main.tf):
+- **Network Least Privilege**: In [`infra/modules/security_groups/main.tf`](../infra/modules/security_groups/main.tf):
   - Inbound HTTP/HTTPS is permitted *only* on the public Application Load Balancer.
   - The API Gateway accepts traffic on port 3000 *only* from the ALB security group.
   - The Inventory microservice accepts traffic on port 8080 *only* from the API Gateway security group.
   - PostgreSQL RDS instances accept connections on port 5432 *only* from the Inventory and Billing security groups.
   - The RabbitMQ broker accepts AMQP connections on port 5672 *only* from the API Gateway and Billing security groups.
   - Public CIDR `0.0.0.0/0` is strictly forbidden across all internal services and database layers.
-- **Cloud IAM Least Privilege**: In [`infra/modules/compute/main.tf`](file:///home/ertval/code/zone-modules/code-keeper/infra/modules/compute/main.tf#L88-L115), ECS Task Execution Roles are scoped strictly to the AWS managed policy `AmazonECSTaskExecutionRolePolicy` (authorizing only ECR image pulls and CloudWatch log writing).
+- **Cloud IAM Least Privilege**: In [`infra/modules/compute/main.tf`](../infra/modules/compute/main.tf#L88-L115), ECS Task Execution Roles are scoped strictly to the AWS managed policy `AmazonECSTaskExecutionRolePolicy` (authorizing only ECR image pulls and CloudWatch log writing).
 
 ---
 
@@ -1000,7 +1006,7 @@ Run the cybersecurity compliance audit script:
 
 > **Auditor Question**: *Does the `README.md` file contain all the necessary information about the solution (prerequisites, setup, configuration, usage, ...)?*  
 > **Verdict**: **YES, EXHAUSTIVELY DETAILED.**  
-> **Evidence**: [`README.md`](file:///home/ertval/code/zone-modules/code-keeper/README.md) covers:
+> **Evidence**: [`README.md`](../README.md) covers:
 > 1. Complete system architecture and AWS topology diagram.
 > 2. Full directory structure tree explaining every file.
 > 3. Prerequisites for Ansible, Terraform, Docker, and GitLab.
@@ -1022,7 +1028,7 @@ Run the cybersecurity compliance audit script:
 
 ## 10. Bonus Defense & Outstanding DevOps Features
 
-[`audit.md`](file:///home/ertval/code/zone-modules/code-keeper/audit.md#L118-L125) awards bonus evaluation points for outstanding features and proprietary implementations:
+[`docs/audit.md`](audit.md#L118-L125) awards bonus evaluation points for outstanding features and proprietary implementations:
 
 ### 10.1 Infracost (FinOps Cloud Cost Shift-Left)
 
@@ -1034,7 +1040,7 @@ Run the cybersecurity compliance audit script:
 ### 10.2 tfsec & Trivy IaC Security Scanning
 
 **Defense Pitch**:
-> *"Beyond application code security, we implemented **Infrastructure as Code (IaC) Security Scanning** in Stage 2 (`Validate`) of [`infra/.gitlab-ci.yml`](file:///home/ertval/code/zone-modules/code-keeper/infra/.gitlab-ci.yml#L71-L80) using **tfsec** and **Trivy IaC** (`trivy config`). This scanner analyzes our Terraform modules against CIS Benchmarks, checking for unencrypted S3 buckets, open security groups, missing CloudWatch log retention policies, or unencrypted RDS storage volumes before `terraform plan` is ever generated."*
+> *"Beyond application code security, we implemented **Infrastructure as Code (IaC) Security Scanning** in Stage 2 (`Validate`) of [`infra/.gitlab-ci.yml`](../infra/.gitlab-ci.yml#L71-L80) using **tfsec** and **Trivy IaC** (`trivy config`). This scanner analyzes our Terraform modules against CIS Benchmarks, checking for unencrypted S3 buckets, open security groups, missing CloudWatch log retention policies, or unencrypted RDS storage volumes before `terraform plan` is ever generated."*
 
 ---
 
@@ -1052,15 +1058,15 @@ Run the cybersecurity compliance audit script:
 
 **Defense Pitch**:
 > *"Rather than utilizing dummy placeholder scripts or generic 'hello world' containers, we implemented the full, proprietary **`crud-master`** microservices codebase in Python:*  
-> 1. **API Gateway (`api-gateway/app/`)**:  
+> 1. **API Gateway (`srcs/api-gateway/app/`)**:  
 >    - Built with Flask and served in production via **Waitress WSGI**.  
 >    - Implements reverse proxy forwarding for movies CRUD to the Inventory microservice.  
 >    - Implements an asynchronous AMQP producer pushing billing orders to RabbitMQ.  
 >    - Embeds an OpenAPI 3.0 specification served at `/openapi.yaml` and interactive Swagger UI documentation at `/docs`.  
-> 2. **Inventory Microservice (`inventory-app/app/`)**:  
+> 2. **Inventory Microservice (`srcs/inventory-app/app/`)**:  
 >    - Implements RESTful CRUD endpoints (`GET /api/movies`, `POST /api/movies`, `DELETE /api/movies/<id>`).  
 >    - Utilizes SQLAlchemy ORM models with PostgreSQL relational storage.  
-> 3. **Billing Microservice (`billing-app/app/`)**:  
+> 3. **Billing Microservice (`srcs/billing-app/app/`)**:  
 >    - Implements a background worker thread (`consume_queue.py`) listening continuously to RabbitMQ's `billing_queue`.  
 >    - Processes asynchronous order messages and records transactions into the PostgreSQL orders database.  
 >    - Exposes RESTful query endpoints and health check probes."*

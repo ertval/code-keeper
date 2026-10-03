@@ -56,12 +56,12 @@ REQUIRED_DIRS=(
   "infra/modules/rds"
   "infra/modules/rabbitmq"
   "infra/modules/compute"
-  "api-gateway/app"
-  "api-gateway/tests"
-  "inventory-app/app"
-  "inventory-app/tests"
-  "billing-app/app"
-  "billing-app/tests"
+  "srcs/api-gateway/app"
+  "srcs/api-gateway/tests"
+  "srcs/inventory-app/app"
+  "srcs/inventory-app/tests"
+  "srcs/billing-app/app"
+  "srcs/billing-app/tests"
   "scripts"
 )
 
@@ -82,7 +82,7 @@ yaml_files = (
     glob.glob('ansible/**/*.yml', recursive=True) +
     glob.glob('ansible/**/*.yaml', recursive=True) +
     glob.glob('**/.gitlab-ci.yml', recursive=True) +
-    glob.glob('api-gateway/*.yaml', recursive=True)
+    glob.glob('srcs/api-gateway/*.yaml', recursive=True)
 )
 
 errors = 0
@@ -126,7 +126,7 @@ if [ $? -eq 0 ]; then log_pass "Infra stages verified"; else log_fail "Infra sta
 
 # 4. Microservice Pipeline Stage Checks
 log_header "4. Validating Microservice Pipeline Stages (CI/CD)"
-MICROSERVICES=("api-gateway" "inventory-app" "billing-app")
+MICROSERVICES=("srcs/api-gateway" "srcs/inventory-app" "srcs/billing-app")
 for ms in "${MICROSERVICES[@]}"; do
   python3 - << PYEOF
 import yaml, sys
@@ -167,7 +167,7 @@ done
 
 # 6. Python Bytecode Compilation Checks
 log_header "6. Validating Python Code Compilation across Microservices"
-if python3 -m compileall -q api-gateway inventory-app billing-app; then
+if python3 -m compileall -q srcs/api-gateway srcs/inventory-app srcs/billing-app; then
   log_pass "Python bytecode compilation succeeded for all microservices"
 else
   log_fail "Python syntax / compilation error encountered"
@@ -175,7 +175,7 @@ fi
 
 # 7. Dockerfile Best Practices Check
 log_header "7. Validating Dockerfile Hardening & Non-Root Execution"
-DOCKERFILES=("api-gateway/Dockerfile" "inventory-app/Dockerfile" "billing-app/Dockerfile")
+DOCKERFILES=("srcs/api-gateway/Dockerfile" "srcs/inventory-app/Dockerfile" "srcs/billing-app/Dockerfile")
 for df in "${DOCKERFILES[@]}"; do
   if grep -q "USER appuser" "$df"; then
     log_pass "$df enforces non-root unprivileged execution (USER appuser)"
@@ -242,7 +242,7 @@ fi
 
 # 11. Microservice Unit Test Execution
 log_header "11. Validating Microservice Unit Test Execution"
-SERVICES=("api-gateway" "inventory-app" "billing-app")
+SERVICES=("srcs/api-gateway" "srcs/inventory-app" "srcs/billing-app")
 for svc in "${SERVICES[@]}"; do
   if command -v uv &>/dev/null; then
     if (cd "$svc" && uv run --with pytest --with pytest-cov --with-requirements requirements.txt pytest -q >/dev/null 2>&1); then

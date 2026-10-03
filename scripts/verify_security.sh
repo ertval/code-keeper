@@ -52,9 +52,9 @@ import yaml, sys
 
 pipeline_files = [
     "infra/.gitlab-ci.yml",
-    "api-gateway/.gitlab-ci.yml",
-    "inventory-app/.gitlab-ci.yml",
-    "billing-app/.gitlab-ci.yml"
+    "srcs/api-gateway/.gitlab-ci.yml",
+    "srcs/inventory-app/.gitlab-ci.yml",
+    "srcs/billing-app/.gitlab-ci.yml"
 ]
 
 all_ok = True
@@ -129,7 +129,7 @@ fi
 log_header "Guideline 3: Apply the Least Privilege Principle"
 
 # 3a. Dockerfiles must run as non-root user
-DOCKERFILES=("api-gateway/Dockerfile" "inventory-app/Dockerfile" "billing-app/Dockerfile")
+DOCKERFILES=("srcs/api-gateway/Dockerfile" "srcs/inventory-app/Dockerfile" "srcs/billing-app/Dockerfile")
 for df in "${DOCKERFILES[@]}"; do
   if grep -qE "USER [a-zA-Z0-9_-]+" "$df" && ! grep -qE "USER root" "$df"; then
     log_pass "$df enforces non-root execution (Least Privilege)"
@@ -172,7 +172,7 @@ log_header "Guideline 4: Automated Vulnerability & Dependency Scanning"
 python3 - << 'PYEOF'
 import yaml, sys
 
-pipelines = ["api-gateway/.gitlab-ci.yml", "inventory-app/.gitlab-ci.yml", "billing-app/.gitlab-ci.yml"]
+pipelines = ["srcs/api-gateway/.gitlab-ci.yml", "srcs/inventory-app/.gitlab-ci.yml", "srcs/billing-app/.gitlab-ci.yml"]
 for p in pipelines:
     with open(p) as f:
         data = yaml.safe_load(f)

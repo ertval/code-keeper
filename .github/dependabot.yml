@@ -1,15 +1,15 @@
 version: 2
 updates:
   - package-ecosystem: "pip"
-    directory: "/api-gateway"
+    directory: "/srcs/api-gateway"
     schedule:
       interval: "weekly"
   - package-ecosystem: "pip"
-    directory: "/inventory-app"
+    directory: "/srcs/inventory-app"
     schedule:
       interval: "weekly"
   - package-ecosystem: "pip"
-    directory: "/billing-app"
+    directory: "/srcs/billing-app"
     schedule:
       interval: "weekly"
   - package-ecosystem: "terraform"
@@ -17,14 +17,14 @@ updates:
     schedule:
       interval: "weekly"
   - package-ecosystem: "docker"
-    directory: "/api-gateway"
+    directory: "/srcs/api-gateway"
     schedule:
       interval: "weekly"
   - package-ecosystem: "docker"
-    directory: "/inventory-app"
+    directory: "/srcs/inventory-app"
     schedule:
       interval: "weekly"
   - package-ecosystem: "docker"
-    directory: "/billing-app"
+    directory: "/srcs/billing-app"
     schedule:
       interval: "weekly"

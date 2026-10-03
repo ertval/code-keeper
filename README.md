@@ -9,7 +9,7 @@
 
 1. **Ansible Automation (`ansible/`)**: Automated provisioning, hardening, and configuration of GitLab Community Edition (CE) and GitLab Runners with Docker executors.
 2. **Infrastructure as Code (`infra/`)**: Dual-environment (Staging & Production) AWS infrastructure defined in modular Terraform, managed via a 6-stage automated pipeline with manual production gating.
-3. **Independent Microservice Pipelines (`api-gateway/`, `inventory-app/`, `billing-app/`)**: Full Python source code, container definitions, and independent 7-stage CI/CD pipelines featuring zero-downtime rolling deployments, SAST, container scanning, secret detection, and automated testing.
+3. **Independent Microservice Pipelines (`srcs/api-gateway/`, `srcs/inventory-app/`, `srcs/billing-app/`)**: Full Python source code, container definitions, and independent 7-stage CI/CD pipelines featuring zero-downtime rolling deployments, SAST, container scanning, secret detection, and automated testing.
 4. **Cybersecurity Hardening**: Strict branch protection enforcement, credential decoupling via GitLab masked/protected variables, least-privilege network and container access, and automated vulnerability scanning.
 5. **Verification & Audit Tooling (`scripts/`)**: Complete simulation and verification scripts (`test_pipelines.sh` and `verify_security.sh`) to audit pipelines and security compliance before deployment.
 
@@ -126,37 +126,41 @@ code-keeper/
 │       ├── rds/                     # PostgreSQL instances (movies & orders)
 │       ├── rabbitmq/                # Managed Amazon MQ RabbitMQ broker
 │       └── compute/                 # ALB, ECS Cluster, Task Definitions, Services
-├── api-gateway/
-│   ├── .gitlab-ci.yml               # 7-stage microservice CI/CD pipeline
-│   ├── Dockerfile                   # Hardened Alpine image with unprivileged appuser
-│   ├── requirements.txt             # Python dependencies
-│   ├── server.py                    # Waitress production WSGI entrypoint
-│   ├── openapi.yaml                 # OpenAPI specification
-│   ├── app/                         # Reverse proxy & RabbitMQ producer logic
-│   └── tests/
-│       └── test_gateway.py          # Unit & integration tests
-├── inventory-app/
-│   ├── .gitlab-ci.yml               # 7-stage microservice CI/CD pipeline
-│   ├── Dockerfile                   # Hardened Alpine image with unprivileged appuser
-│   ├── requirements.txt             # Python dependencies
-│   ├── server.py                    # Waitress production WSGI entrypoint
-│   ├── app/                         # RESTful movies CRUD & SQLAlchemy models
-│   └── tests/
-│       └── test_inventory.py        # Comprehensive CRUD & healthcheck tests
-├── billing-app/
-│   ├── .gitlab-ci.yml               # 7-stage microservice CI/CD pipeline
-│   ├── Dockerfile                   # Hardened Alpine image with unprivileged appuser
-│   ├── requirements.txt             # Python dependencies
-│   ├── server.py                    # Waitress production WSGI entrypoint
-│   ├── app/                         # AMQP consumer worker & orders database handler
-│   └── tests/
-│       └── test_billing.py          # Order validation, model, and endpoint tests
+├── srcs/                            # Microservice application source code
+│   ├── api-gateway/
+│   │   ├── .gitlab-ci.yml           # 7-stage microservice CI/CD pipeline
+│   │   ├── Dockerfile               # Hardened Alpine image with unprivileged appuser
+│   │   ├── requirements.txt         # Python dependencies
+│   │   ├── server.py                # Waitress production WSGI entrypoint
+│   │   ├── openapi.yaml             # OpenAPI specification
+│   │   ├── app/                     # Reverse proxy & RabbitMQ producer logic
+│   │   └── tests/
+│   │       └── test_gateway.py      # Unit & integration tests
+│   ├── inventory-app/
+│   │   ├── .gitlab-ci.yml           # 7-stage microservice CI/CD pipeline
+│   │   ├── Dockerfile               # Hardened Alpine image with unprivileged appuser
+│   │   ├── requirements.txt         # Python dependencies
+│   │   ├── server.py                # Waitress production WSGI entrypoint
+│   │   ├── app/                     # RESTful movies CRUD & SQLAlchemy models
+│   │   └── tests/
+│   │       └── test_inventory.py    # Comprehensive CRUD & healthcheck tests
+│   └── billing-app/
+│       ├── .gitlab-ci.yml           # 7-stage microservice CI/CD pipeline
+│       ├── Dockerfile               # Hardened Alpine image with unprivileged appuser
+│       ├── requirements.txt         # Python dependencies
+│       ├── server.py                # Waitress production WSGI entrypoint
+│       ├── app/                     # AMQP consumer worker & orders database handler
+│       └── tests/
+│           └── test_billing.py      # Order validation, model, and endpoint tests
 ├── scripts/
 │   ├── test_pipelines.sh            # Complete verification and test script
 │   └── verify_security.sh           # Cybersecurity compliance audit script
+├── docs/
+│   ├── readme.md                    # 01-edu subject requirements (source of truth)
+│   ├── audit.md                     # Auditor checklist and evaluation criteria
+│   └── AUDIT_GUIDE.md               # Audit defense manual & stakeholder Q&A
 ├── .gitignore                       # Guards credentials, .env, tfstate, and artifacts
-├── README.md                        # Complete project documentation and audit answers
-└── audit.md                         # Auditor checklist and evaluation criteria
+└── README.md                        # Implementation documentation and audit answers
 ```
 
 ---
@@ -257,7 +261,7 @@ Each microservice (`api-gateway`, `inventory-app`, `billing-app`) operates an in
 
 This repo is a monorepo, but each pipeline behaves like an independent repo via
 `rules:changes:paths`: `infra/**/*` gates Init/Validate/Plan, and
-`api-gateway/**/*`, `inventory-app/**/*`, `billing-app/**/*` gate the matching
+`srcs/api-gateway/**/*`, `srcs/inventory-app/**/*`, `srcs/billing-app/**/*` gate the matching
 service's Build/Test/Scan jobs. Deploys stay `main`-only. All pipelines are
 strictly `main`-only (`workflow:rules`); there are no MR pipelines by audit
 requirement.
@@ -328,9 +332,9 @@ Run the provided verification scripts to audit all pipelines and security contro
   [PASS] Directory structure and all components exist
   [PASS] All 14 Ansible YAML files and 4 GitLab CI files valid
   [PASS] infra/.gitlab-ci.yml matches exact 6 stages
-  [PASS] api-gateway/.gitlab-ci.yml matches exact 7 stages
-  [PASS] inventory-app/.gitlab-ci.yml matches exact 7 stages
-  [PASS] billing-app/.gitlab-ci.yml matches exact 7 stages
+  [PASS] srcs/api-gateway/.gitlab-ci.yml matches exact 7 stages
+  [PASS] srcs/inventory-app/.gitlab-ci.yml matches exact 7 stages
+  [PASS] srcs/billing-app/.gitlab-ci.yml matches exact 7 stages
   [PASS] All shell scripts pass syntax check (bash -n)
   [PASS] Python bytecode compilation succeeded (python3 -m compileall)
   [PASS] Dockerfiles enforce non-root unprivileged execution (USER appuser)
@@ -360,7 +364,7 @@ Run the provided verification scripts to audit all pipelines and security contro
 
 ## 6. Audit & Stakeholder Role-Play Q&A Guide
 
-Below are direct, comprehensive answers to the questions listed in `audit.md` for the stakeholder interview:
+Below are direct, comprehensive answers to the questions listed in [`docs/audit.md`](docs/audit.md) for the stakeholder interview. The full defense manual lives in [`docs/AUDIT_GUIDE.md`](docs/AUDIT_GUIDE.md), and the original 01-edu subject requirements are preserved in [`docs/readme.md`](docs/readme.md):
 
 ### Q1: Can you explain the concept of DevOps and its benefits for the software development lifecycle?
 **Answer**: DevOps is a cultural and technical methodology that bridges the gap between software development (Dev) and IT operations (Ops). By introducing continuous collaboration, automated testing, continuous integration, and automated deployment, DevOps shortens the development life cycle, increases deployment frequency, reduces change failure rates, and accelerates time-to-market while ensuring high quality and system reliability.
