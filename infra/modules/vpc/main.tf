@@ -1,3 +1,13 @@
+terraform {
+  required_version = ">= 1.5.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
 resource "aws_vpc" "main" {
   cidr_block           = var.cidr_block
   enable_dns_hostnames = true
@@ -21,11 +31,13 @@ resource "aws_internet_gateway" "gw" {
 
 # Public Subnets
 resource "aws_subnet" "public" {
-  count                   = length(var.public_subnet_cidrs)
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.public_subnet_cidrs[count.index]
-  availability_zone       = var.availability_zones[count.index]
-  map_public_ip_on_launch = true
+  count             = length(var.public_subnet_cidrs)
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.public_subnet_cidrs[count.index]
+  availability_zone = var.availability_zones[count.index]
+  # Nothing launches in the public subnets (the NAT gateway holds the EIP and the
+  # ALB is internet facing), so instances must not inherit a public address.
+  map_public_ip_on_launch = false
 
   tags = {
     Name        = "code-keeper-${var.environment}-public-${count.index + 1}"
@@ -139,4 +151,81 @@ resource "aws_route_table_association" "database" {
   count          = length(aws_subnet.database)
   subnet_id      = aws_subnet.database[count.index].id
   route_table_id = aws_route_table.database.id
+}
+
+# Lock down the VPC default security group, which otherwise allows all traffic.
+resource "aws_default_security_group" "default" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name        = "code-keeper-${var.environment}-default-sg"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# VPC Flow Logs for network forensics and anomaly detection.
+resource "aws_cloudwatch_log_group" "flow_logs" {
+  name              = "/aws/vpc/code-keeper-${var.environment}/flow-logs"
+  retention_in_days = 30
+
+  tags = {
+    Name        = "code-keeper-${var.environment}-vpc-flow-logs"
+    Environment = var.environment
+  }
+}
+
+data "aws_iam_policy_document" "flow_logs_assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["vpc-flow-logs.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "flow_logs" {
+  name_prefix        = "code-keeper-${var.environment}-vpc-flow-logs-"
+  assume_role_policy = data.aws_iam_policy_document.flow_logs_assume_role.json
+
+  tags = {
+    Name        = "code-keeper-${var.environment}-vpc-flow-logs-role"
+    Environment = var.environment
+  }
+}
+
+resource "aws_iam_role_policy" "flow_logs" {
+  name_prefix = "code-keeper-${var.environment}-vpc-flow-logs-"
+  role        = aws_iam_role.flow_logs.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "WriteFlowLogs"
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "${aws_cloudwatch_log_group.flow_logs.arn}:*"
+      },
+      {
+        Sid      = "DescribeLogDelivery"
+        Effect   = "Allow"
+        Action   = ["logs:DescribeLogGroups", "logs:DescribeLogStreams"]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_flow_log" "main" {
+  iam_role_arn    = aws_iam_role.flow_logs.arn
+  log_destination = aws_cloudwatch_log_group.flow_logs.arn
+  traffic_type    = "ALL"
+  vpc_id          = aws_vpc.main.id
+
+  tags = {
+    Name        = "code-keeper-${var.environment}-vpc-flow-log"
+    Environment = var.environment
+  }
 }

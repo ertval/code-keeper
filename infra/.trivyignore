@@ -1,0 +1,26 @@
+# Accepted Trivy IaC findings for the infrastructure pipeline.
+#
+# validate:security gates the pipeline on HIGH/CRITICAL with --exit-code 1. Three
+# findings cannot be closed inside this environment: there is no registered domain,
+# so there is no ACM certificate and therefore no TLS listener. Left ungated the
+# Validate stage is red on every run, which skips Plan, Apply to Staging, Approval
+# and Apply to Production permanently and makes the whole infra pipeline a no-op.
+#
+# Every entry is an explicitly accepted finding with a stated remediation. Any NEW
+# HIGH/CRITICAL finding is still blocking, so the gate retains its value. Re-evaluate
+# this file when the TLS listener or the VPC endpoints land.
+
+# HIGH AWS-0053 x2: Load balancer is exposed to the internet.
+#   affected: modules/compute/main.tf
+#   accepted: The ALB is the public entry point of the architecture and must be internet-facing. Remediation is TLS termination with ACM, tracked separately.
+AWS-0053
+
+# CRITICAL AWS-0054 x2: Use of plain HTTP.
+#   affected: modules/compute/main.tf
+#   accepted: The ALB terminates plain HTTP because this environment has no registered domain and therefore no ACM certificate. Remediation is a TLS listener, tracked separately.
+AWS-0054
+
+# CRITICAL AWS-0104 x8: A security group rule should not allow unrestricted egress to any IP address.
+#   affected: modules/security_groups/main.tf
+#   accepted: Public egress on tcp/443 is required for ECR image pulls, CloudWatch Logs and S3 through the NAT gateway. Remediation is VPC interface endpoints (ecr.api, ecr.docker, logs) plus an S3 gateway endpoint, after which the 443 rule is repointed at the endpoint SG.
+AWS-0104

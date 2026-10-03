@@ -1,0 +1,22 @@
+[
+ {
+  "RuleID": "private-key",
+  "Description": "Identified a Private Key, which may compromise cryptographic security and sensitive data encryption.",
+  "StartLine": 219,
+  "EndLine": 221,
+  "StartColumn": 5,
+  "EndColumn": 34,
+  "Match": "REDACTED",
+  "Secret": "REDACTED",
+  "File": "scripts/verify_security.sh",
+  "SymlinkFile": "",
+  "Commit": "",
+  "Entropy": 3.6698058,
+  "Author": "",
+  "Email": "",
+  "Date": "",
+  "Message": "",
+  "Tags": [],
+  "Fingerprint": "scripts/verify_security.sh:private-key:219"
+ }
+]

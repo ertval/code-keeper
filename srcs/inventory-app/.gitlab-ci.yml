@@ -1,233 +1,583 @@
-# ==============================================================================
-# GitLab CI/CD Pipeline: Inventory App Microservice
-# Stages: Build, Test, Scan, Containerization, Deploy to Staging, Approval, Deploy to Production
-# Security: Protected branch restricted, secret masking, least privilege, zero downtime
-# ==============================================================================
-
-stages:
-  - Build
-  - Test
-  - Scan
-  - Containerization
-  - Deploy to Staging
-  - Approval
-  - Deploy to Production
-
-variables:
-  APP_NAME: "inventory-app"
-  IMAGE_TAG: "${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
-  IMAGE_STAGING: "${CI_REGISTRY_IMAGE}:staging-latest"
-  IMAGE_PROD: "${CI_REGISTRY_IMAGE}:production-latest"
-  DOCKER_TLS_CERTDIR: "/certs"
-  AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
-  ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
-  ECS_CLUSTER_PROD: "code-keeper-production-cluster"
-
-# Strict audit: main-only pipelines (no MR pipelines).
-workflow:
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      when: always
-    - when: never
-
-# ------------------------------------------------------------------------------
-# Stage 1: Build
-# ------------------------------------------------------------------------------
-build:package:
+inventory-app:build:package:
   stage: Build
   image: python:3.11-alpine
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      changes:
-        paths:
-          - srcs/inventory-app/**/*
-      when: on_success
-    - when: never
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH == "main"
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - when: never
   script:
-    - echo "=== [Build] Compiling Bytecode & Validating Packaging ==="
-    - pip install --no-cache-dir -r requirements.txt
-    - python3 -m compileall -b .
+  - echo "=== [Build] Compiling Bytecode & Validating Packaging ==="
+  - pip install --no-cache-dir -r requirements.txt
+  - python3 -m compileall -b .
+    # Artifact paths are resolved from the project root, not from the service
+    # directory, so they are declared service-relative and verified to exist.
+  - test -f requirements.txt || { echo "ERROR: declared artifact requirements.txt not found in ${APP_DIR}"; exit 1; }
   artifacts:
     paths:
-      - requirements.txt
+    - srcs/inventory-app/requirements.txt
     expire_in: 1 day
 
 # ------------------------------------------------------------------------------
 # Stage 2: Test
 # ------------------------------------------------------------------------------
-test:unit:
+  variables:
+    APP_NAME: "inventory-app"
+    APP_DIR: "srcs/inventory-app"
+    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
+    ECS_CLUSTER_PROD: "code-keeper-production-cluster"
+  before_script:
+  - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
+  - cd "${APP_DIR}"
+  - pwd
+inventory-app:test:unit:
   stage: Test
   image: python:3.11-alpine
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      changes:
-        paths:
-          - srcs/inventory-app/**/*
-      when: on_success
-    - when: never
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH == "main"
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - when: never
   before_script:
-    - pip install --no-cache-dir -r requirements.txt pytest pytest-cov
+  - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
+  - cd "${APP_DIR}"
+  - pwd
+  - cd "${APP_DIR}"
+  - pip install --no-cache-dir -r requirements.txt pytest pytest-cov
   script:
-    - echo "=== [Test] Running Unit and Integration Test Suite ==="
-    - pytest --cov=app --cov-report=term-missing --junitxml=junit-report.xml tests/
+  - echo "=== [Test] Running Unit and Integration Test Suite ==="
+  - pytest --cov=app --cov-report=term-missing --junitxml=junit-report.xml tests/
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
     when: always
     reports:
-      junit: junit-report.xml
+      junit: srcs/inventory-app/junit-report.xml
     expire_in: 7 days
 
 # ------------------------------------------------------------------------------
 # Stage 3: Scan
 # ------------------------------------------------------------------------------
-scan:sast_bandit:
+  variables:
+    APP_NAME: "inventory-app"
+    APP_DIR: "srcs/inventory-app"
+    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
+    ECS_CLUSTER_PROD: "code-keeper-production-cluster"
+inventory-app:scan:sast_bandit:
   stage: Scan
   image: python:3.11-alpine
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      changes:
-        paths:
-          - srcs/inventory-app/**/*
-      when: on_success
-    - when: never
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH == "main"
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - when: never
   before_script:
-    - pip install --no-cache-dir bandit
+  - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
+  - cd "${APP_DIR}"
+  - pwd
+  - cd "${APP_DIR}"
+  - pip install --no-cache-dir bandit
   script:
-    - echo "=== [Scan] Executing Bandit AST Security Analysis ==="
-    - bandit -r app/ -ll -ii -f screen
+  - echo "=== [Scan] Executing Bandit AST Security Analysis ==="
+  - bandit -r app/ -ll -ii -f screen
   allow_failure: false
 
-scan:secret_detection:
+  variables:
+    APP_NAME: "inventory-app"
+    APP_DIR: "srcs/inventory-app"
+    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
+    ECS_CLUSTER_PROD: "code-keeper-production-cluster"
+inventory-app:scan:secret_detection:
   stage: Scan
   image:
     name: zricethezav/gitleaks:latest
     entrypoint: [""]
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      changes:
-        paths:
-          - srcs/inventory-app/**/*
-      when: on_success
-    - when: never
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH == "main"
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - when: never
   script:
-    - echo "=== [Scan] Checking for Hardcoded Credentials / Secrets ==="
-    - gitleaks detect --verbose --source . --no-git
+  - echo "=== [Scan] Checking for Hardcoded Credentials / Secrets ==="
+  - gitleaks detect --verbose --source . --no-git
   allow_failure: false
 
-scan:trivy_fs:
+  variables:
+    APP_NAME: "inventory-app"
+    APP_DIR: "srcs/inventory-app"
+    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
+    ECS_CLUSTER_PROD: "code-keeper-production-cluster"
+  before_script:
+  - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
+  - cd "${APP_DIR}"
+  - pwd
+inventory-app:scan:trivy_fs:
   stage: Scan
   image:
     name: aquasec/trivy:latest
     entrypoint: [""]
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      changes:
-        paths:
-          - srcs/inventory-app/**/*
-      when: on_success
-    - when: never
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH == "main"
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - when: never
   script:
-    - echo "=== [Scan] Running Trivy Filesystem Vulnerability Scan ==="
-    - trivy fs --severity HIGH,CRITICAL --exit-code 1 .
+  - echo "=== [Scan] Running Trivy Filesystem Vulnerability Scan ==="
+  - trivy fs --severity HIGH,CRITICAL --exit-code 1 .
   allow_failure: false
 
-scan:sonarqube:
+  variables:
+    APP_NAME: "inventory-app"
+    APP_DIR: "srcs/inventory-app"
+    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
+    ECS_CLUSTER_PROD: "code-keeper-production-cluster"
+  before_script:
+  - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
+  - cd "${APP_DIR}"
+  - pwd
+inventory-app:scan:sonarqube:
   stage: Scan
   image:
     name: sonarsource/sonar-scanner-cli:latest
     entrypoint: [""]
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      changes:
-        paths:
-          - srcs/inventory-app/**/*
-      when: on_success
-    - when: never
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH == "main"
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH
+    changes:
+      paths:
+      - srcs/inventory-app/**/*
+    when: on_success
+  - when: never
   script:
-    - echo "=== [Scan] Running SonarQube Code Quality & Security Gate ==="
-    - >
-      if [ -n "${SONAR_HOST_URL:-}" ]; then
-        sonar-scanner \
-          -Dsonar.projectKey=code-keeper-inventory-app \
-          -Dsonar.sources=app \
-          -Dsonar.host.url="${SONAR_HOST_URL}" \
-          -Dsonar.login="${SONAR_TOKEN}"
-      else
-        echo "WARNING: SonarQube credentials not configured; skipping remote upload (configure SONAR_HOST_URL/SONAR_TOKEN to enforce the gate)."
-      fi
+  - echo "=== [Scan] Running SonarQube Code Quality & Security Gate ==="
+  - >
+    if [ -n "${SONAR_HOST_URL:-}" ]; then
+      sonar-scanner \
+        -Dsonar.projectKey=code-keeper-inventory-app \
+        -Dsonar.sources=app \
+        -Dsonar.host.url="${SONAR_HOST_URL}" \
+        -Dsonar.login="${SONAR_TOKEN}"
+    else
+      echo "WARNING: SonarQube credentials not configured; skipping remote upload (configure SONAR_HOST_URL/SONAR_TOKEN to enforce the gate)."
+    fi
   allow_failure: false
+
+# Advisory, non-blocking. pip-audit resolves its advisory database over the network and
+# fails on an outage exactly like it fails on a real advisory, so it must not gate the
+# promotion path. Every retry also makes the attempt non-idempotent (pip-audit writes
+# pip-audit.log), which would defeat a caching retry strategy. The database-backed gate
+# is scan:trivy_fs, which caches its DB in the Scan stage cache and runs offline-free.
+  variables:
+    APP_NAME: "inventory-app"
+    APP_DIR: "srcs/inventory-app"
+    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
+    ECS_CLUSTER_PROD: "code-keeper-production-cluster"
+  before_script:
+  - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
+  - cd "${APP_DIR}"
+  - pwd
+inventory-app:scan:dependencies:
+  stage: Scan
+  image: python:3.11-alpine
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule"
+    when: on_success
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: on_success
+  - if: $CI_COMMIT_BRANCH == "main"
+    when: on_success
+  - if: $CI_COMMIT_BRANCH
+    when: on_success
+  - when: never
+  before_script:
+  - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
+  - cd "${APP_DIR}"
+  - pwd
+  - cd "${APP_DIR}"
+  - pip install --no-cache-dir pip-audit
+  script:
+  - echo "=== [Scan] Reporting dependency advisories against requirements.txt (advisory only) ==="
+  - |
+    if pip-audit -r requirements.txt; then
+      echo "=== [Scan] No known advisory matches the pinned dependencies ==="
+    else
+      echo "=== [Scan] pip-audit reported findings or could not reach the advisory database ==="
+      echo "=== [Scan] Not gating: see scan:trivy_fs for the blocking dependency gate ==="
+    fi
+  allow_failure: true
 
 # ------------------------------------------------------------------------------
 # Stage 4: Containerization (Docker Build & Push - Protected Main Branch Only)
 # ------------------------------------------------------------------------------
-containerize:docker:
+# Kaniko builds and pushes straight to the registry as an unprivileged process:
+# the runner is registered with privileged = false and without the Docker socket,
+# so docker-in-docker cannot start here (see ansible/roles/gitlab_runner).
+  variables:
+    APP_NAME: "inventory-app"
+    APP_DIR: "srcs/inventory-app"
+    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
+    ECS_CLUSTER_PROD: "code-keeper-production-cluster"
+inventory-app:containerize:docker:
   stage: Containerization
-  image: docker:24.0.5
-  services:
-    - docker:24.0.5-dind
+  image:
+    name: gcr.io/kaniko-project/executor:v1.23.2-debug
+    entrypoint: [""]
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+  - if: $CI_PIPELINE_SOURCE == "schedule"
+    when: never
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: on_success
+  - if: $CI_COMMIT_BRANCH == "main"
+    when: on_success
+  - when: never
+  variables:
+    APP_NAME: "inventory-app"
+    APP_DIR: "srcs/inventory-app"
+    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
+    ECS_CLUSTER_PROD: "code-keeper-production-cluster"
+    DOCKER_CONFIG: "/workspace/.docker"
   before_script:
-    - echo "${CI_REGISTRY_PASSWORD}" | docker login -u "${CI_REGISTRY_USER}" --password-stdin "${CI_REGISTRY}"
+  - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
+  - cd "${APP_DIR}"
+  - pwd
+  - mkdir -p "${DOCKER_CONFIG}"
+  - printf '{{"auths":{{"{0}":{{"username":"{1}","password":"{2}"}}}}}}' "${CI_REGISTRY}" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" > "${DOCKER_CONFIG}/config.json"
   script:
-    - echo "=== [Containerization] Building Docker Image ==="
-    - docker build -t "${IMAGE_TAG}" -t "${IMAGE_STAGING}" .
-    - echo "=== [Containerization] Scanning Built Image with Trivy ==="
-    - docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL --exit-code 1 "${IMAGE_TAG}"
-    - echo "=== [Containerization] Pushing Image to Registry ==="
-    - docker push "${IMAGE_TAG}"
-    - docker push "${IMAGE_STAGING}"
+  - echo "=== [Containerization] Building Docker Image with Kaniko (no privileged runner required) ==="
+    # Pre-flight: kaniko resolves a relative --dockerfile against the build context, so
+    # both the context and the Dockerfile must live in the same service directory. The
+    # fail-fast checks make a wrong path an error instead of a silent cross-service build.
+  - SERVICE_DIR="${CI_PROJECT_DIR}/${APP_DIR}"
+  - test -d "${SERVICE_DIR}" || { echo "ERROR: service directory ${SERVICE_DIR} does not exist"; exit 1; }
+  - test -f "${SERVICE_DIR}/Dockerfile" || { echo "ERROR: no Dockerfile at ${SERVICE_DIR}/Dockerfile"; exit 1; }
+  - test -f "${SERVICE_DIR}/requirements.txt" || { echo "ERROR: no requirements.txt at ${SERVICE_DIR}/requirements.txt"; exit 1; }
+  - echo "Build context ${SERVICE_DIR} (Dockerfile: Dockerfile, context-relative)"
+  - /kaniko/executor --context "${SERVICE_DIR}" --dockerfile "Dockerfile" --destination "${IMAGE_TAG}" --cache=false
+  - echo "=== [Containerization] Pushed immutable image ${IMAGE_TAG} ==="
+  - echo "Release aliases are promoted by the CD stages, not by this job."
+
+inventory-app:containerize:image_scan:
+  stage: Containerization
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule"
+    when: never
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: on_success
+  - if: $CI_COMMIT_BRANCH == "main"
+    when: on_success
+  - when: never
+  needs:
+  - containerize:docker
+  variables:
+    APP_NAME: "inventory-app"
+    APP_DIR: "srcs/inventory-app"
+    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
+    ECS_CLUSTER_PROD: "code-keeper-production-cluster"
+    TRIVY_USERNAME: "${CI_REGISTRY_USER}"
+    TRIVY_PASSWORD: "${CI_REGISTRY_PASSWORD}"
+  script:
+  - echo "=== [Containerization] Scanning published image ${IMAGE_TAG} with Trivy ==="
+  - trivy image --severity HIGH,CRITICAL --exit-code 1 "${IMAGE_TAG}"
+  allow_failure: false
 
 # ------------------------------------------------------------------------------
 # Stage 5: Deploy to Staging
 # ------------------------------------------------------------------------------
-deploy:staging:
+  before_script:
+  - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
+  - cd "${APP_DIR}"
+  - pwd
+inventory-app:deploy:staging:
+  needs:
+  - job: containerize:docker
+    artifacts: false
   stage: Deploy to Staging
-  image: amazon/aws-cli:latest
+  image:
+    name: amazon/aws-cli:latest
+    entrypoint: [""]
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+  - if: $CI_PIPELINE_SOURCE == "schedule"
+    when: never
+  - if: $CI_COMMIT_BRANCH == "main"
   environment:
     name: staging
     url: https://staging.code-keeper.internal
+  variables:
+    APP_NAME: "inventory-app"
+    APP_DIR: "srcs/inventory-app"
+    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
+    ECS_CLUSTER_PROD: "code-keeper-production-cluster"
+    TASK_FAMILY: "code-keeper-staging-${APP_NAME}"
+    SERVICE_NAME: "code-keeper-staging-${APP_NAME}"
+    TARGET_IMAGE: "${IMAGE_TAG}"
+  before_script:
+  - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
+  - cd "${APP_DIR}"
+  - pwd
+  - command -v jq >/dev/null 2>&1 || (yum install -y -q jq || microdnf install -y -q jq)
+  - command -v crane >/dev/null 2>&1 || (curl -fsSL https://github.com/google/go-containerregistry/releases/download/v0.20.2/go-containerregistry_Linux_x86_64.tar.gz | tar xz -C /usr/local/bin crane)
   script:
-    - echo "=== [CD] Deploying ${APP_NAME} to Staging Environment ==="
-    - aws ecs update-service --cluster "${ECS_CLUSTER_STAGING}" --service "code-keeper-staging-${APP_NAME}" --force-new-deployment --region "${AWS_DEFAULT_REGION:-us-east-1}"
-    - aws ecs wait services-stable --cluster "${ECS_CLUSTER_STAGING}" --services "code-keeper-staging-${APP_NAME}" --region "${AWS_DEFAULT_REGION:-us-east-1}"
-    - curl -f --retry 5 --retry-delay 3 "http://staging.code-keeper.internal:8080/health"
+  - echo "=== [CD] Deploying ${APP_NAME} to Staging Environment ==="
+  - echo "=== [CD] Verifying ${TARGET_IMAGE} exists in the registry before touching the task definition ==="
+  - |
+    if ! printf '%s' "${CI_REGISTRY_PASSWORD}" | crane auth login "${CI_REGISTRY}" -u "${CI_REGISTRY_USER}" --password-stdin >/dev/null 2>&1; then
+      echo "ERROR: cannot authenticate to ${CI_REGISTRY}; refusing to mutate ${TASK_FAMILY}"; exit 1
+    fi
+  - crane digest "${TARGET_IMAGE}" >/dev/null 2>&1 || { echo "ERROR: ${TARGET_IMAGE} is not in the registry (was it built on this commit?); refusing to point ${TASK_FAMILY} at a missing image"; exit 1; }
+  - echo "=== [CD] Verifying ${TARGET_IMAGE} exists in the registry before touching the task definition ==="
+
+  - echo "=== [CD] Describing the running task definition of ${APP_NAME} ==="
+  - aws ecs describe-task-definition --task-definition "${TASK_FAMILY}" --region "${AWS_DEFAULT_REGION:-us-east-1}" --query taskDefinition --output json > taskdef.json
+  - CURRENT_IMAGE=$(jq -r --arg container "${APP_NAME}" '.containerDefinitions[] | select(.name == $container) | .image' taskdef.json)
+  - test -n "${CURRENT_IMAGE}" || { echo "ERROR: no container named ${APP_NAME} in task definition ${TASK_FAMILY}"; exit 1; }
+  - echo "Running image: ${CURRENT_IMAGE}"
+  - echo "Promoting to: ${TARGET_IMAGE}"
+  - |
+    if [ "${CURRENT_IMAGE}" = "${TARGET_IMAGE}" ]; then
+      echo "Task definition ${TASK_FAMILY} already runs ${TARGET_IMAGE}, nothing to promote."
+    else
+      jq --arg container "${APP_NAME}" --arg image "${TARGET_IMAGE}" '
+        del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities,
+            .registeredAt, .registeredBy, .deregisteredAt, .enableFaultInjection)
+        | (.containerDefinitions[] | select(.name == $container) | .image) = $image
+      ' taskdef.json > taskdef.patched.json
+      NEW_TASKDEF=$(aws ecs register-task-definition --cli-input-json file://taskdef.patched.json --region "${AWS_DEFAULT_REGION:-us-east-1}" --query taskDefinition.taskDefinitionArn --output text)
+      echo "Registered new task definition revision ${NEW_TASKDEF}"
+      aws ecs update-service --cluster "${ECS_CLUSTER_STAGING}" --service "${SERVICE_NAME}" --task-definition "${NEW_TASKDEF}" --region "${AWS_DEFAULT_REGION:-us-east-1}"
+    fi
+  - aws ecs wait services-stable --cluster "${ECS_CLUSTER_STAGING}" --services "${SERVICE_NAME}" --region "${AWS_DEFAULT_REGION:-us-east-1}"
+  - curl -f --retry 5 --retry-delay 3 "http://staging.code-keeper.internal:8080/health"
 
 # ------------------------------------------------------------------------------
 # Stage 6: Approval (Manual Gate for Production Promotion)
 # ------------------------------------------------------------------------------
-approval:production:
+inventory-app:approval:production:
   stage: Approval
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+  - if: $CI_PIPELINE_SOURCE == "schedule"
+    when: never
+  - if: $CI_COMMIT_BRANCH == "main"
   when: manual
   allow_failure: false
   script:
-    - echo "============================================================"
-    - echo " Stakeholder Approval Confirmed for Production Deployment"
-    - echo " Application:  ${APP_NAME}"
-    - echo " Release Tag:  ${IMAGE_TAG}"
-    - echo " Authorized by: ${GITLAB_USER_NAME} (${GITLAB_USER_EMAIL})"
-    - echo "============================================================"
+  - echo "============================================================"
+  - echo " Stakeholder Approval Confirmed for Production Deployment"
+  - echo " Application: ${APP_NAME}"
+  - echo " Release Tag: ${IMAGE_TAG}"
+  - echo " Authorized by: ${GITLAB_USER_NAME} (${GITLAB_USER_EMAIL})"
+  - echo "============================================================"
 
 # ------------------------------------------------------------------------------
 # Stage 7: Deploy to Production (Zero-Downtime Rolling Update)
 # ------------------------------------------------------------------------------
-deploy:production:
+# Moves the immutable commit tag onto the production-latest alias inside the
+# registry (a registry side copy, so no Docker daemon is required), then the
+# production service is rolled onto that alias.
+  variables:
+    APP_NAME: "inventory-app"
+    APP_DIR: "srcs/inventory-app"
+    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
+    ECS_CLUSTER_PROD: "code-keeper-production-cluster"
+  before_script:
+  - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
+  - cd "${APP_DIR}"
+  - pwd
+inventory-app:promote:image:
   stage: Deploy to Production
-  image: amazon/aws-cli:latest
+  image:
+    name: gcr.io/go-containerregistry/crane:0.20.2
+    entrypoint: [""]
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+  - if: $CI_PIPELINE_SOURCE == "schedule"
+    when: never
+  - if: $CI_COMMIT_BRANCH == "main"
   needs:
-    - approval:production
-    - deploy:staging
+  - approval:production
+  - deploy:staging
+  variables:
+    APP_NAME: "inventory-app"
+    APP_DIR: "srcs/inventory-app"
+    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
+    ECS_CLUSTER_PROD: "code-keeper-production-cluster"
+    DOCKER_CONFIG: "/workspace/.docker"
+  before_script:
+  - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
+  - cd "${APP_DIR}"
+  - pwd
+  - mkdir -p "${DOCKER_CONFIG}"
+  - printf '{"auths":{"%s":{"username":"%s","password":"%s"}}}' "${CI_REGISTRY}" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" > "${DOCKER_CONFIG}/config.json"
+  script:
+  - echo "=== [CD] Promoting ${IMAGE_TAG} to the ${IMAGE_PROD} release alias ==="
+  - crane copy "${IMAGE_TAG}" "${IMAGE_PROD}"
+  - SHA_DIGEST=$(crane digest "${IMAGE_TAG}") || { echo "ERROR: cannot resolve ${IMAGE_TAG}"; exit 1; }
+  - ALIAS_DIGEST=$(crane digest "${IMAGE_PROD}") || { echo "ERROR: cannot resolve ${IMAGE_PROD}"; exit 1; }
+  - test -n "${SHA_DIGEST}" || { echo "ERROR: empty digest for ${IMAGE_TAG}"; exit 1; }
+  - test "${SHA_DIGEST}" = "${ALIAS_DIGEST}" || { echo "ERROR: ${IMAGE_PROD} resolves to ${ALIAS_DIGEST} but ${IMAGE_TAG} is ${SHA_DIGEST}"; exit 1; }
+  - echo "=== [CD] ${IMAGE_PROD} -> ${ALIAS_DIGEST} (promoted from ${IMAGE_TAG}) ==="
+
+inventory-app:deploy:production:
+  stage: Deploy to Production
+  image:
+    name: amazon/aws-cli:latest
+    entrypoint: [""]
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule"
+    when: never
+  - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+  - approval:production
+  - promote:image
+  - deploy:staging
+  - job: containerize:docker
+    artifacts: false
   environment:
     name: production
     url: https://production.code-keeper.internal
+  variables:
+    APP_NAME: "inventory-app"
+    APP_DIR: "srcs/inventory-app"
+    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
+    ECS_CLUSTER_PROD: "code-keeper-production-cluster"
+    TASK_FAMILY: "code-keeper-production-${APP_NAME}"
+    SERVICE_NAME: "code-keeper-production-${APP_NAME}"
+    TARGET_IMAGE: "${IMAGE_PROD}"
+  before_script:
+  - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
+  - cd "${APP_DIR}"
+  - pwd
+  - command -v jq >/dev/null 2>&1 || (yum install -y -q jq || microdnf install -y -q jq)
+  - command -v crane >/dev/null 2>&1 || (curl -fsSL https://github.com/google/go-containerregistry/releases/download/v0.20.2/go-containerregistry_Linux_x86_64.tar.gz | tar xz -C /usr/local/bin crane)
   script:
-    - echo "=== [CD] Executing Zero-Downtime Rolling Deployment to Production ==="
-    - aws ecs update-service --cluster "${ECS_CLUSTER_PROD}" --service "code-keeper-production-${APP_NAME}" --force-new-deployment --region "${AWS_DEFAULT_REGION:-us-east-1}"
-    - aws ecs wait services-stable --cluster "${ECS_CLUSTER_PROD}" --services "code-keeper-production-${APP_NAME}" --region "${AWS_DEFAULT_REGION:-us-east-1}"
-    - curl -f --retry 10 --retry-delay 5 "http://production.code-keeper.internal:8080/health"
+  - echo "=== [CD] Executing Zero-Downtime Rolling Deployment to Production ==="
+
+  - echo "=== [CD] Describing the running task definition of ${APP_NAME} ==="
+  - aws ecs describe-task-definition --task-definition "${TASK_FAMILY}" --region "${AWS_DEFAULT_REGION:-us-east-1}" --query taskDefinition --output json > taskdef.json
+  - CURRENT_IMAGE=$(jq -r --arg container "${APP_NAME}" '.containerDefinitions[] | select(.name == $container) | .image' taskdef.json)
+  - test -n "${CURRENT_IMAGE}" || { echo "ERROR: no container named ${APP_NAME} in task definition ${TASK_FAMILY}"; exit 1; }
+  - echo "Running image: ${CURRENT_IMAGE}"
+  - echo "Promoting to: ${TARGET_IMAGE}"
+  - |
+    if [ "${CURRENT_IMAGE}" = "${TARGET_IMAGE}" ]; then
+      echo "Task definition ${TASK_FAMILY} already runs ${TARGET_IMAGE}, nothing to promote."
+    else
+      jq --arg container "${APP_NAME}" --arg image "${TARGET_IMAGE}" '
+        del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities,
+            .registeredAt, .registeredBy, .deregisteredAt, .enableFaultInjection)
+        | (.containerDefinitions[] | select(.name == $container) | .image) = $image
+      ' taskdef.json > taskdef.patched.json
+      NEW_TASKDEF=$(aws ecs register-task-definition --cli-input-json file://taskdef.patched.json --region "${AWS_DEFAULT_REGION:-us-east-1}" --query taskDefinition.taskDefinitionArn --output text)
+      echo "Registered new task definition revision ${NEW_TASKDEF}"
+      aws ecs update-service --cluster "${ECS_CLUSTER_PROD}" --service "${SERVICE_NAME}" --task-definition "${NEW_TASKDEF}" --region "${AWS_DEFAULT_REGION:-us-east-1}"
+    fi
+  - aws ecs wait services-stable --cluster "${ECS_CLUSTER_PROD}" --services "${SERVICE_NAME}" --region "${AWS_DEFAULT_REGION:-us-east-1}"
+  - curl -f --retry 10 --retry-delay 5 "http://production.code-keeper.internal:8080/health"

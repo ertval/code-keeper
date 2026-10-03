@@ -20,7 +20,9 @@ gitlab_email_enabled: false
 gitlab_signup_enabled: false
 gitlab_default_projects_limit: 50
 gitlab_default_branch_name: "main"
-gitlab_default_branch_protection: 2  # 2 = Fully protected (Developers cannot push, only Maintainers)
+# Applied by the cicd task to ApplicationSetting.default_branch_protection:
+# 0 = fully unprotected, 1 = protected against pushes, 2 = fully protected.
+gitlab_default_branch_protection: 2
 
 # CI/CD Settings
 gitlab_shared_runners_enabled: true

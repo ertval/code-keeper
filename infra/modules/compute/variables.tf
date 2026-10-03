@@ -96,6 +96,57 @@ variable "billing_db_host" {
   type        = string
 }
 
+variable "inventory_db_username" {
+  description = "Username the inventory app must present to PostgreSQL."
+  type        = string
+}
+
+variable "inventory_db_password" {
+  description = "Password for INVENTORY_DB_USER. Never defaulted; must come from a sensitive TF_VAR."
+  type        = string
+  sensitive   = true
+}
+
+variable "inventory_db_name" {
+  description = "Inventory database name."
+  type        = string
+  default     = "movies"
+}
+
+variable "billing_db_username" {
+  description = "Username the billing app must present to PostgreSQL."
+  type        = string
+}
+
+variable "billing_db_password" {
+  description = "Password for BILLING_DB_USER. Never defaulted; must come from a sensitive TF_VAR."
+  type        = string
+  sensitive   = true
+}
+
+variable "billing_db_name" {
+  description = "Billing database name."
+  type        = string
+  default     = "orders"
+}
+
+variable "rabbitmq_username" {
+  description = "RabbitMQ username the gateway and billing consumer authenticate with."
+  type        = string
+}
+
+variable "rabbitmq_password" {
+  description = "Password for RABBITMQ_USER. Never defaulted; must come from a sensitive TF_VAR."
+  type        = string
+  sensitive   = true
+}
+
+variable "rabbitmq_port" {
+  description = "Broker port. 5671 for AWS MQ (AMQPS), 5672 for plaintext."
+  type        = number
+  default     = 5671
+}
+
 variable "rabbitmq_host" {
   description = "RabbitMQ broker host"
   type        = string

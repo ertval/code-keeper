@@ -1,0 +1,45 @@
+
+##### ansible/playbooks/deploy-gitlab.yml
+
+playbook: ansible/playbooks/deploy-gitlab.yml
+
+  play #1 (gitlab_servers): Deploy and Configure GitLab CE Instance	TAGS: []
+    tasks:
+      Fail when GitLab root password is not provided	TAGS: []
+      gitlab : Install prerequisite packages for GitLab	TAGS: []
+      gitlab : Check if GitLab repository is already configured	TAGS: []
+      gitlab : Download GitLab CE repository setup script (no curl|bash pipe)	TAGS: []
+      gitlab : Add GitLab CE APT repository via pinned setup script	TAGS: []
+      gitlab : Install GitLab CE package	TAGS: []
+      gitlab : Ensure /etc/gitlab configuration directory exists	TAGS: []
+      gitlab : Deploy gitlab.rb configuration template	TAGS: []
+      gitlab : Flush handlers to execute immediate reconfiguration if changed	TAGS: []
+      gitlab : Check initial root password file if exists	TAGS: []
+      gitlab : Display note about initial root password file	TAGS: []
+      gitlab : Wait for GitLab web interface to respond	TAGS: []
+      gitlab : Configure GitLab application settings and CI/CD parameters via rails runner	TAGS: []
+      gitlab : Report CI/CD settings configuration status	TAGS: []
+      Verify GitLab services status	TAGS: []
+      Print GitLab status	TAGS: []
+
+##### ansible/playbooks/deploy-runners.yml
+
+playbook: ansible/playbooks/deploy-runners.yml
+
+  play #1 (gitlab_runners): Deploy and Configure GitLab Runners	TAGS: []
+    tasks:
+      Fail when GitLab runner token is not provided	TAGS: []
+      gitlab_runner : Install prerequisite packages for GitLab Runner and Docker	TAGS: []
+      gitlab_runner : Ensure Docker service is enabled and running	TAGS: []
+      gitlab_runner : Check if GitLab Runner repository is present	TAGS: []
+      gitlab_runner : Download GitLab Runner repository setup script (no curl|bash pipe)	TAGS: []
+      gitlab_runner : Add official GitLab Runner APT repository via pinned setup script	TAGS: []
+      gitlab_runner : Install GitLab Runner package	TAGS: []
+      gitlab_runner : Check if GitLab Runner is already registered	TAGS: []
+      gitlab_runner : Register GitLab Runner with Docker executor	TAGS: []
+      gitlab_runner : Ensure gitlab-runner user is in docker group	TAGS: []
+      gitlab_runner : Ensure concurrent jobs setting is updated in config.toml	TAGS: []
+      gitlab_runner : Ensure GitLab Runner service is started and enabled	TAGS: []
+      Check registered runners	TAGS: []
+      Verify GitLab Runner systemd daemon status	TAGS: []
+      Print GitLab Runner verification summary	TAGS: []

@@ -1,0 +1,400 @@
+{
+  "schema": "code-keeper/audit-orchestrator/1",
+  "generated_at": "2026-10-03T23:12:49+0300",
+  "generator": "scripts/audit_orchestrator.sh",
+  "shell_options": "set -uo pipefail; `set -e` is deliberately omitted so a failing control is recorded as a verdict instead of aborting the audit walk",
+  "repo": {
+    "root": "/home/ertval/code/zone-modules/code-keeper",
+    "commit": "74f62014a6d04e7204909342df4271d4d08e9cbd",
+    "branch": "main",
+    "dirty": true
+  },
+  "options": {
+    "only": null,
+    "strict": false,
+    "advisory": true
+  },
+  "audit_source": {
+    "path": "docs/audit.md",
+    "questions": 22,
+    "sections": 9,
+    "roleplay_prompts": 16
+  },
+  "tool_versions": {
+    "terraform": "Terraform v1.9.5",
+    "ansible-playbook": "ansible-playbook [core 2.19.13]",
+    "ansible-lint": "ansible-lint \u001b[1;36m26.9.0\u001b[0m using\u001b[2m ansible-core:\u001b[1;36m2.19.13\u001b[0m ansible-compat:\u001b[1;36m26.9.0\u001b[0m ruamel-yaml:\u001b[1;36m0.19.1\u001b[0m\u001b[0m",
+    "tflint": "TFLint version 0.56.0",
+    "checkov": "3.3.22",
+    "tfsec": "v1.28.14",
+    "trivy": "Version: 0.75.0",
+    "hadolint": "Haskell Dockerfile Linter 2.12.0",
+    "gitleaks": "gitleaks version 8.24.0",
+    "yamllint": "yamllint 1.38.0",
+    "shellcheck": "ShellCheck - shell script analysis tool",
+    "uv": "uv 0.11.19 (x86_64-unknown-linux-gnu)",
+    "python3": "Python 3.12.3",
+    "jq": "jq-1.7",
+    "docker": "Docker version 29.8.1, build 4a63305",
+    "terragrunt": "terragrunt version v0.72.0"
+  },
+  "totals": {
+    "PASS": 68,
+    "FAIL": 14,
+    "BLOCKED-EXTERNAL": 3,
+    "SKIP": 0,
+    "INFO": 16,
+    "verdicts": 101
+  },
+  "verdict_semantics": {
+    "PASS": "control proven locally",
+    "FAIL": "control disproven locally (student defect)",
+    "BLOCKED-EXTERNAL": "proof needs the live target (SSH / real pipeline run); not a defect",
+    "SKIP": "precondition unmet (missing tool or file); never a silent pass",
+    "INFO": "reported finding that does not gate the run"
+  },
+  "exit_code": 1,
+  "blocked_external_controls": [
+    "RUNNER-LIVE-LIST",
+    "GITLAB-LIVE-STATUS",
+    "FUNC-LIVE-PIPELINE"
+  ],
+  "failed_controls": [
+    "CI-SCAN/api-gateway",
+    "CI-SCAN/billing-app",
+    "CI-SCAN/inventory-app",
+    "CI-CONTAINER/api-gateway",
+    "CI-CONTAINER/billing-app",
+    "CI-CONTAINER/inventory-app",
+    "CD-ZERO-DOWNTIME/api-gateway",
+    "CD-ZERO-DOWNTIME/billing-app",
+    "CD-ZERO-DOWNTIME/inventory-app",
+    "CYB2-GITLEAKS",
+    "CYB2-ASSIGNMENT",
+    "CYB3-SG-DATASTORE",
+    "CYB4-TERRAFORM-EFFECTIVE",
+    "BONUS-CLAIMS"
+  ],
+  "unmapped_questions": [
+    "Q011",
+    "Q051",
+    "Q053",
+    "Q055",
+    "Q059",
+    "Q061",
+    "Q065",
+    "Q071",
+    "Q106",
+    "Q110",
+    "Q116",
+    "Q122"
+  ],
+  "controls": [
+    "CI-WORKFLOW/api-gateway",
+    "CI-WORKFLOW/billing-app",
+    "CI-WORKFLOW/inventory-app",
+    "CYB1-JOBS",
+    "CYB1-NEGATIVE",
+    "CYB1-WORKFLOW"
+  ],
+  "questions": [
+    {
+      "id": "Q011",
+      "line": 11,
+      "slug": "are-all-the-required-files-present",
+      "text": "Are all the required files present?",
+      "section_id": "S003",
+      "verdict": "SKIP(manual)",
+      "controls": [],
+      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
+    },
+    {
+      "id": "Q051",
+      "line": 51,
+      "slug": "do-all-of-the-students-have-a-good-understandi",
+      "text": "Do all of the students have a good understanding of the concepts and technologies used in the project?",
+      "section_id": "S013",
+      "verdict": "SKIP(manual)",
+      "controls": [],
+      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
+    },
+    {
+      "id": "Q053",
+      "line": 53,
+      "slug": "do-all-of-the-students-have-the-ability-to-com",
+      "text": "Do all of the students have the ability to communicate effectively and explain their decisions?",
+      "section_id": "S013",
+      "verdict": "SKIP(manual)",
+      "controls": [],
+      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
+    },
+    {
+      "id": "Q055",
+      "line": 55,
+      "slug": "are-all-of-the-students-capable-of-thinking-cr",
+      "text": "Are all of the students capable of thinking critically about their solution and considering alternative approaches?",
+      "section_id": "S013",
+      "verdict": "SKIP(manual)",
+      "controls": [],
+      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
+    },
+    {
+      "id": "Q059",
+      "line": 59,
+      "slug": "was-the-gitlab-instance-deployed-and-configure",
+      "text": "Was the GitLab instance deployed and configured successfully using Ansible?",
+      "section_id": "S057",
+      "verdict": "SKIP(manual)",
+      "controls": [],
+      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
+    },
+    {
+      "id": "Q061",
+      "line": 61,
+      "slug": "are-the-gitlab-runners-integrated-with-the-exi",
+      "text": "Are the GitLab Runners integrated with the existing pipeline and executing tasks as expected for all repositories?",
+      "section_id": "S057",
+      "verdict": "SKIP(manual)",
+      "controls": [],
+      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
+    },
+    {
+      "id": "Q065",
+      "line": 65,
+      "slug": "did-the-student-deploy-the-infrastructure-of-t",
+      "text": "Did the student deploy the infrastructure of the `cloud-design` project and the source code of `crud-master` project for two environments (staging, prod) on a cloud platform (e.g., AWS, Azure, or Google Cloud) using `Terraform`?",
+      "section_id": "S063",
+      "verdict": "SKIP(manual)",
+      "controls": [],
+      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
+    },
+    {
+      "id": "Q067",
+      "line": 67,
+      "slug": "are-the-two-environments-similar-in-design-res",
+      "text": "Are the two environments similar in design, resources and services used?",
+      "section_id": "S063",
+      "verdict": "BLOCKED-EXTERNAL",
+      "controls": [
+        "ADV-ANSIBLELINT",
+        "ANSIBLE-LISTTASKS",
+        "ANSIBLE-ROLES",
+        "ANSIBLE-SYNTAX",
+        "ANSIBLE-TASKS",
+        "GITLAB-LIVE-STATUS"
+      ],
+      "evidence": "2/2 playbooks pass ansible-playbook --syntax-check"
+    },
+    {
+      "id": "Q069",
+      "line": 69,
+      "slug": "does-the-student-s-infrastructure-configuratio",
+      "text": "Does the student's infrastructure configuration exist in an independent repository with a configured pipeline?",
+      "section_id": "S063",
+      "verdict": "BLOCKED-EXTERNAL",
+      "controls": [
+        "RUNNER-FILES",
+        "RUNNER-LIVE-LIST",
+        "RUNNER-TAGS"
+      ],
+      "evidence": "docker executor rendered from config.toml.j2; registration passes --tag-list; privileged=templated false"
+    },
+    {
+      "id": "Q071",
+      "line": 71,
+      "slug": "are-the-init-validate-plan-apply-to-staging-ap",
+      "text": "Are the \"Init\", \"Validate\", \"Plan\", \"Apply to Staging\", \"Approval\", and \"Apply to production environment\" stages implemented correctly in the infrastructure pipeline?",
+      "section_id": "S063",
+      "verdict": "SKIP(manual)",
+      "controls": [],
+      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
+    },
+    {
+      "id": "Q080",
+      "line": 80,
+      "slug": "are-the-build-test-scan-and-containerization-s",
+      "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+      "section_id": "S073",
+      "verdict": "INFO",
+      "controls": [
+        "ADV-TRIVY",
+        "INFRA-ENVIRONMENTS",
+        "INFRA-FMT",
+        "INFRA-VALIDATE-PRODUCTION",
+        "INFRA-VALIDATE-STAGING"
+      ],
+      "evidence": "2 independent environments with identical file contracts (main/variables/outputs/tfvars)"
+    },
+    {
+      "id": "Q088",
+      "line": 88,
+      "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+      "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+      "section_id": "S082",
+      "verdict": "PASS",
+      "controls": [
+        "INFRA-PARITY"
+      ],
+      "evidence": "both environments wire the same 5 modules from the same sources; only sizing overrides differ"
+    },
+    {
+      "id": "Q092",
+      "line": 92,
+      "slug": "are-the-pipelines-working-properly-and-updatin",
+      "text": "Are the pipelines working properly and updating the application and infrastructure after each modification in each repository?",
+      "section_id": "S090",
+      "verdict": "INFO",
+      "controls": [
+        "INFRA-INDEPENDENT"
+      ],
+      "evidence": "infra/ owns its own pipeline building infra/**, but workflow:rules also triggers on [$CI_PIPELINE_SOURCE == \"merge_request_event\"; $CI_COMMIT_BRANCH]; guideline 1 wording expects protected-branch-only triggers (main-only workflow seen in: CYB1-WORKFLOW)"
+    },
+    {
+      "id": "Q104",
+      "line": 104,
+      "slug": "are-triggers-restricted-to-protected-branches-",
+      "text": "Are triggers restricted to protected branches, ensuring unauthorized users cannot deploy or tamper with the application?",
+      "section_id": "S094",
+      "verdict": "PASS",
+      "controls": [
+        "INFRA-GATE",
+        "INFRA-STAGE-JOBS",
+        "INFRA-STAGES"
+      ],
+      "evidence": "stages: Init -> Validate -> Plan -> Apply to Staging -> Approval -> Apply to Production"
+    },
+    {
+      "id": "Q106",
+      "line": 106,
+      "slug": "have-the-students-separated-credentials-from-c",
+      "text": "Have the students separated credentials from code, using secure methods like secret management tools or environment variables?",
+      "section_id": "S094",
+      "verdict": "SKIP(manual)",
+      "controls": [],
+      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
+    },
+    {
+      "id": "Q108",
+      "line": 108,
+      "slug": "did-the-students-apply-the-least-privilege-pri",
+      "text": "Did the students apply the least privilege principle to limit user and service access to the minimum required level?",
+      "section_id": "S094",
+      "verdict": "FAIL",
+      "controls": [
+        "ADV-TFLINT",
+        "CI-BUILD/api-gateway",
+        "CI-BUILD/billing-app",
+        "CI-BUILD/inventory-app",
+        "CI-CONTAINER/api-gateway",
+        "CI-CONTAINER/billing-app",
+        "CI-CONTAINER/inventory-app",
+        "CI-SCAN-NEGATIVE",
+        "CI-SCAN-POSITIVE",
+        "CI-SCAN/api-gateway",
+        "CI-SCAN/billing-app",
+        "CI-SCAN/inventory-app",
+        "CI-STAGES/api-gateway",
+        "CI-STAGES/billing-app",
+        "CI-STAGES/inventory-app",
+        "CI-TEST/api-gateway",
+        "CI-TEST/billing-app",
+        "CI-TEST/inventory-app"
+      ],
+      "evidence": "api-gateway: Scan stage is not genuine (decorative/no-op scan jobs: scan:dependencies(image=python:3.11-alpine,tools=none))"
+    },
+    {
+      "id": "Q110",
+      "line": 110,
+      "slug": "do-the-students-have-a-process-for-updating-de",
+      "text": "Do the students have a process for updating dependencies and tools regularly, automating updates, and monitoring for security advisories and patches?",
+      "section_id": "S094",
+      "verdict": "SKIP(manual)",
+      "controls": [],
+      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
+    },
+    {
+      "id": "Q114",
+      "line": 114,
+      "slug": "does-the-readme-md-file-contain-all-the-necess",
+      "text": "Does the `README.md` file contain all the necessary information about the solution (prerequisites, setup, configuration, usage, ...)?",
+      "section_id": "S112",
+      "verdict": "FAIL",
+      "controls": [
+        "CD-APPROVAL-FIXTURE",
+        "CD-APPROVAL/api-gateway",
+        "CD-APPROVAL/billing-app",
+        "CD-APPROVAL/inventory-app",
+        "CD-GATE/api-gateway",
+        "CD-GATE/billing-app",
+        "CD-GATE/inventory-app",
+        "CD-STAGES/api-gateway",
+        "CD-STAGES/billing-app",
+        "CD-STAGES/inventory-app",
+        "CD-STAGING/api-gateway",
+        "CD-STAGING/billing-app",
+        "CD-STAGING/inventory-app",
+        "CD-ZERO-DOWNTIME/api-gateway",
+        "CD-ZERO-DOWNTIME/billing-app",
+        "CD-ZERO-DOWNTIME/inventory-app"
+      ],
+      "evidence": "api-gateway: promote:image has no rolling/force-new-deployment mechanism; promote:image does not wait for health/stability"
+    },
+    {
+      "id": "Q116",
+      "line": 116,
+      "slug": "is-the-documentation-provided-by-the-student-c",
+      "text": "Is the documentation provided by the student clear and complete, including well-structured diagrams and thorough descriptions?",
+      "section_id": "S112",
+      "verdict": "SKIP(manual)",
+      "controls": [],
+      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
+    },
+    {
+      "id": "Q120",
+      "line": 120,
+      "slug": "did-the-student-implemented-any-feature-or-any",
+      "text": "+Did the student implemented any feature or anything that you would consider a bonus?",
+      "section_id": "S112",
+      "verdict": "BLOCKED-EXTERNAL",
+      "controls": [
+        "FUNC-APPLY",
+        "FUNC-COMPILE",
+        "FUNC-HADOLINT",
+        "FUNC-LIVE-PIPELINE",
+        "FUNC-PYTEST/api-gateway",
+        "FUNC-PYTEST/billing-app",
+        "FUNC-PYTEST/inventory-app",
+        "FUNC-SHELL",
+        "FUNC-YAML"
+      ],
+      "evidence": "uv run pytest: 6 passed in 0.31s"
+    },
+    {
+      "id": "Q122",
+      "line": 122,
+      "slug": "did-the-student-used-his-her-own-crud-master-s",
+      "text": "+Did the student used his/her own `crud-master` source code for this project?",
+      "section_id": "S112",
+      "verdict": "SKIP(manual)",
+      "controls": [],
+      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
+    },
+    {
+      "id": "Q124",
+      "line": 124,
+      "slug": "is-this-project-an-outstanding-project",
+      "text": "+Is this project an outstanding project?",
+      "section_id": "S112",
+      "verdict": "INFO",
+      "controls": [
+        "CI-WORKFLOW/api-gateway",
+        "CI-WORKFLOW/billing-app",
+        "CI-WORKFLOW/inventory-app",
+        "CYB1-JOBS",
+        "CYB1-NEGATIVE",
+        "CYB1-WORKFLOW"
+      ],
+      "evidence": "api-gateway: workflow:rules also triggers on [$CI_PIPELINE_SOURCE == \"merge_request_event\"; $CI_COMMIT_BRANCH] \u2014 deliberate CI-on-MR design, but audit guideline 1 asks for protected-branch-only triggers; destructive stages stay main-gated (proof: CYB1-JOBS)"
+    }
+  ]
+}

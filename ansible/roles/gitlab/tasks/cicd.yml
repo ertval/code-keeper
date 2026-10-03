@@ -2,13 +2,21 @@
 - name: Configure GitLab application settings and CI/CD parameters via rails runner
   ansible.builtin.shell: |
     gitlab-rails runner "
+      protection_level = {{ gitlab_default_branch_protection }}
+      merge_access = case protection_level
+      when 0 then []
+      when 1 then [Gitlab::Access::DEVELOPER]
+      else [Gitlab::Access::MAINTAINER]
+      end
+      push_access = protection_level < 1 ? [] : [Gitlab::Access::MAINTAINER]
       settings = ApplicationSetting.current_without_cache
       settings.update!(
         signup_enabled: {{ gitlab_signup_enabled | lower }},
         default_branch_name: '{{ gitlab_default_branch_name }}',
+        default_branch_protection: protection_level,
         default_branch_protection_defaults: {
-          'allowed_to_push' => [{'access_level' => Gitlab::Access::MAINTAINER}],
-          'allowed_to_merge' => [{'access_level' => Gitlab::Access::DEVELOPER}],
+          'allowed_to_push' => push_access,
+          'allowed_to_merge' => merge_access,
           'allow_force_push' => false
         },
         max_artifacts_size: {{ gitlab_artifacts_max_size }},

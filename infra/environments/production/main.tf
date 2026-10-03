@@ -1,5 +1,10 @@
 terraform {
   required_version = ">= 1.5.0"
+
+  # Partial backend configuration: the S3 parameters live in backend.hcl and are
+  # supplied with -backend-config, so no state location or credential is committed.
+  backend "s3" {}
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -20,6 +25,15 @@ provider "aws" {
   }
 }
 
+locals {
+  # Derived so the CD pipeline stays the source of truth for the running revision:
+  # it promotes the immutable commit SHA tag and drives release_tag from the
+  # pipeline. An explicit *_image variable always takes precedence.
+  api_gateway_image   = coalesce(var.api_gateway_image, "${var.image_repository_prefix}/api-gateway:${var.release_tag}")
+  inventory_app_image = coalesce(var.inventory_app_image, "${var.image_repository_prefix}/inventory-app:${var.release_tag}")
+  billing_app_image   = coalesce(var.billing_app_image, "${var.image_repository_prefix}/billing-app:${var.release_tag}")
+}
+
 module "vpc" {
   source                = "../../modules/vpc"
   environment           = var.environment
@@ -34,6 +48,7 @@ module "security_groups" {
   source      = "../../modules/security_groups"
   environment = var.environment
   vpc_id      = module.vpc.vpc_id
+  vpc_cidr    = var.cidr_block
 }
 
 module "rds" {
@@ -69,15 +84,26 @@ module "compute" {
   api_gateway_security_group_id   = module.security_groups.api_gateway_security_group_id
   inventory_app_security_group_id = module.security_groups.inventory_app_security_group_id
   billing_app_security_group_id   = module.security_groups.billing_app_security_group_id
-  api_gateway_image               = var.api_gateway_image
-  inventory_app_image             = var.inventory_app_image
-  billing_app_image               = var.billing_app_image
+  api_gateway_image               = local.api_gateway_image
+  inventory_app_image             = local.inventory_app_image
+  billing_app_image               = local.billing_app_image
   gateway_replicas                = 4
   inventory_replicas              = 4
   billing_replicas                = 4
   cpu                             = "512"
   memory                          = "1024"
   inventory_db_host               = module.rds.inventory_db_address
+  inventory_db_username           = module.rds.inventory_db_username
+  inventory_db_password           = var.inventory_db_password
+  inventory_db_name               = module.rds.inventory_db_name
   billing_db_host                 = module.rds.billing_db_address
-  rabbitmq_host                   = "code-keeper-${var.environment}-rabbitmq"
+  billing_db_username             = module.rds.billing_db_username
+  billing_db_password             = var.billing_db_password
+  billing_db_name                 = module.rds.billing_db_name
+  # The broker's real hostname. It used to be the Terraform resource *name*,
+  # which is not resolvable in DNS, so no client could ever connect.
+  rabbitmq_host     = module.rabbitmq.broker_host
+  rabbitmq_port     = module.rabbitmq.broker_port
+  rabbitmq_username = var.rabbitmq_username
+  rabbitmq_password = var.rabbitmq_password
 }

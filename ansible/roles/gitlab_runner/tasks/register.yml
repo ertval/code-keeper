@@ -1,12 +1,29 @@
 ---
-- name: Check if GitLab Runner is already registered
-  ansible.builtin.shell: |
-    gitlab-runner list 2>&1
+# Keep every `#` comment in this file OUTSIDE any `command:`/`shell:` block
+# scalar. Inside a folded (`>`) or literal (`|`) scalar `#` is not a comment --
+# it is literal content, folded into the command string and then split into argv
+# by the command module, which does not use a shell. A comment placed inside the
+# register command below is passed to gitlab-runner as ~16 bogus arguments,
+# registration fails, and `failed_when: false` reports success anyway.
+
+- name: List already-registered GitLab Runners
+  ansible.builtin.command: gitlab-runner list
   register: existing_runners
   changed_when: false
   failed_when: false
+  check_mode: false
+
+- name: Pre-render the --docker-volumes arguments
+  # A {% for %} inside the folded scalar below does not expand as it appears
+  # to; it leaves a literal `{{ vol }}` in argv. Render the quoted list once,
+  # here, where Jinja is actually evaluated.
+  ansible.builtin.set_fact:
+    runner_docker_volumes_arg: >-
+      {% for vol in gitlab_runner_docker_volumes %}"{{ vol }}" {% endfor %}
 
 - name: Register GitLab Runner with Docker executor
+  # privileged stays false because container images are built with kaniko,
+  # which needs neither a privileged runner nor a Docker socket.
   ansible.builtin.command: >
     gitlab-runner register
     --non-interactive
@@ -19,14 +36,31 @@
     --run-untagged="{{ gitlab_runner_run_untagged | lower }}"
     --locked="{{ gitlab_runner_locked | lower }}"
     --access-level="{{ gitlab_runner_access_level }}"
-    # Least privilege: never register privileged runners. Build container
-    # images with kaniko or rootless builders instead of docker-in-docker.
-    --docker-privileged=false
-    {% for vol in gitlab_runner_docker_volumes %}
-    --docker-volumes "{{ vol }}"
-    {% endfor %}
-  when: "gitlab_runner_description not in existing_runners.stdout and gitlab_runner_url not in existing_runners.stdout"
+    --docker-privileged="{{ gitlab_runner_docker_privileged | lower }}"
+    --docker-volumes {{ runner_docker_volumes_arg }}
+  when: gitlab_runner_description not in existing_runners.stdout
   register: runner_registration
-  failed_when: false
+  changed_when: true
   notify:
     - Restart GitLab Runner
+  check_mode: false
+
+- name: Assert the runner is actually registered
+  # Closes the silent-failure class: a non-zero exit from `register` above used
+  # to be swallowed, so a play that never registered a runner still reported
+  # success. Verify against ground truth instead of trusting the exit status.
+  ansible.builtin.command: gitlab-runner list
+  register: runners_after_registration
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Fail unless {{ gitlab_runner_description }} appears in the runner list
+  ansible.builtin.assert:
+    that:
+      - gitlab_runner_description in runners_after_registration.stdout
+    fail_msg: >-
+      gitlab-runner register did not take effect: "{{ gitlab_runner_description }}"
+      is absent from `gitlab-runner list`. Registration exited
+      {{ runner_registration.rc | default('n/a') }}. See the output above.
+  when: runner_registration is not skipped

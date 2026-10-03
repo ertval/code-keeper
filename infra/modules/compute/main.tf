@@ -1,3 +1,13 @@
+terraform {
+  required_version = ">= 1.5.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
 # Application Load Balancer
 resource "aws_lb" "alb" {
   name               = "code-keeper-${var.environment}-alb"
@@ -5,6 +15,9 @@ resource "aws_lb" "alb" {
   load_balancer_type = "application"
   security_groups    = [var.alb_security_group_id]
   subnets            = var.public_subnet_ids
+
+  drop_invalid_header_fields = true
+  enable_deletion_protection = true
 
   tags = {
     Name        = "code-keeper-${var.environment}-alb"
@@ -148,8 +161,12 @@ resource "aws_ecs_task_definition" "api_gateway" {
         { name = "INVENTORY_APP_HOST", value = "inventory-app.${var.environment}.local" },
         { name = "INVENTORY_APP_PORT", value = "8080" },
         { name = "RABBITMQ_HOST", value = var.rabbitmq_host },
-        { name = "RABBITMQ_PORT", value = "5672" },
-        { name = "RABBITMQ_QUEUE", value = "billing_queue" }
+        { name = "RABBITMQ_PORT", value = tostring(var.rabbitmq_port) },
+        { name = "RABBITMQ_QUEUE", value = "billing_queue" },
+        # Without these the clients authenticated as the app's hardcoded dev
+        # user, which does not exist on the broker.
+        { name = "RABBITMQ_USER", value = var.rabbitmq_username },
+        { name = "RABBITMQ_PASSWORD", value = var.rabbitmq_password }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -184,6 +201,11 @@ resource "aws_ecs_service" "api_gateway" {
     container_name   = "api-gateway"
     container_port   = 3000
   }
+  # The CD pipeline owns task definition revisions, so Terraform must not
+  # revert a promoted image on the next apply.
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
 }
 
 # 2. Inventory App Task Definition & Service
@@ -208,9 +230,14 @@ resource "aws_ecs_task_definition" "inventory_app" {
       ]
       environment = [
         { name = "APP_PORT", value = "8080" },
-        { name = "POSTGRES_HOST", value = var.inventory_db_host },
-        { name = "POSTGRES_PORT", value = "5432" },
-        { name = "POSTGRES_DB", value = "movies" }
+        # The app reads INVENTORY_DB_*; POSTGRES_* was never read by anything,
+        # so the container fell through to its dev defaults and could not reach
+        # RDS. Names below must match srcs/inventory-app/app/__init__.py.
+        { name = "INVENTORY_DB_HOST", value = var.inventory_db_host },
+        { name = "INVENTORY_DB_PORT", value = "5432" },
+        { name = "INVENTORY_DB_NAME", value = var.inventory_db_name },
+        { name = "INVENTORY_DB_USER", value = var.inventory_db_username },
+        { name = "INVENTORY_DB_PASSWORD", value = var.inventory_db_password }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -243,6 +270,11 @@ resource "aws_ecs_service" "inventory_app" {
   service_registries {
     registry_arn = aws_service_discovery_service.inventory.arn
   }
+  # The CD pipeline owns task definition revisions, so Terraform must not
+  # revert a promoted image on the next apply.
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
 }
 
 # 3. Billing App Task Definition & Service (Worker)
@@ -267,12 +299,19 @@ resource "aws_ecs_task_definition" "billing_app" {
       ]
       environment = [
         { name = "APP_PORT", value = "8080" },
-        { name = "POSTGRES_HOST", value = var.billing_db_host },
-        { name = "POSTGRES_PORT", value = "5432" },
-        { name = "POSTGRES_DB", value = "orders" },
+        # Matches srcs/billing-app/app/__init__.py, which reads BILLING_DB_*.
+        { name = "BILLING_DB_HOST", value = var.billing_db_host },
+        { name = "BILLING_DB_PORT", value = "5432" },
+        { name = "BILLING_DB_NAME", value = var.billing_db_name },
+        { name = "BILLING_DB_USER", value = var.billing_db_username },
+        { name = "BILLING_DB_PASSWORD", value = var.billing_db_password },
         { name = "RABBITMQ_HOST", value = var.rabbitmq_host },
-        { name = "RABBITMQ_PORT", value = "5672" },
-        { name = "RABBITMQ_QUEUE", value = "billing_queue" }
+        { name = "RABBITMQ_PORT", value = tostring(var.rabbitmq_port) },
+        { name = "RABBITMQ_QUEUE", value = "billing_queue" },
+        # Without these the clients authenticated as the app's hardcoded dev
+        # user, which does not exist on the broker.
+        { name = "RABBITMQ_USER", value = var.rabbitmq_username },
+        { name = "RABBITMQ_PASSWORD", value = var.rabbitmq_password }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -300,5 +339,10 @@ resource "aws_ecs_service" "billing_app" {
     subnets          = var.private_subnet_ids
     security_groups  = [var.billing_app_security_group_id]
     assign_public_ip = false
+  }
+  # The CD pipeline owns task definition revisions, so Terraform must not
+  # revert a promoted image on the next apply.
+  lifecycle {
+    ignore_changes = [task_definition]
   }
 }

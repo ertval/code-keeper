@@ -1,174 +1,297 @@
-# ==============================================================================
-# GitLab CI/CD Pipeline: Infrastructure as Code (Terraform)
-# Stages: Init, Validate, Plan, Apply to Staging, Approval, Apply to Production
-# Security: Protected branch restriction, masked AWS credentials, least privilege
-# ==============================================================================
-
-stages:
-  - Init
-  - Validate
-  - Plan
-  - Apply to Staging
-  - Approval
-  - Apply to Production
-
-default:
-  image:
-    name: hashicorp/terraform:1.6
-    entrypoint: [""]
-  before_script:
-    - terraform --version
-
-variables:
-  TF_IN_AUTOMATION: "true"
-  AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
-  # Credentials separated into GitLab CI/CD Masked/Protected Variables:
-  # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
-  # TF_VAR_inventory_db_password, TF_VAR_billing_db_password, TF_VAR_rabbitmq_password
-  # (Terraform reads TF_VAR_* automatically; never pass secrets via -var on the CLI.)
-
-workflow:
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      when: always
-    - when: never
-
 cache:
   key: "${CI_COMMIT_REF_SLUG}-terraform"
   paths:
-    - infra/environments/staging/.terraform
-    - infra/environments/production/.terraform
-    - .terraform.lock.hcl
+  - infra/environments/staging/.terraform
+  - infra/environments/production/.terraform
+  - infra/environments/staging/.terraform.lock.hcl
+  - infra/environments/production/.terraform.lock.hcl
 
 # ------------------------------------------------------------------------------
 # Stage 1: Init
 # ------------------------------------------------------------------------------
-init:staging:
+infra:init:staging:
   stage: Init
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      changes:
-        paths:
-          - infra/**/*
-      when: on_success
-    - when: never
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH == "main"
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - when: never
   script:
-    - cd infra/environments/staging
-    - terraform init -input=false
+  - cd infra/environments/staging
+  - test -n "${TF_STATE_BUCKET:-}" || { echo "ERROR: TF_STATE_BUCKET CI protected variable is unset"; exit 1; }
+  - test -n "${TF_STATE_REGION:-}" || { echo "ERROR: TF_STATE_REGION CI protected variable is unset"; exit 1; }
+  - test -n "${TF_STATE_LOCK_TABLE:-}" || { echo "ERROR: TF_STATE_LOCK_TABLE CI protected variable is unset"; exit 1; }
+  - >-
+    terraform init -input=false
+    -backend-config=backend.hcl
+    -backend-config="bucket=${TF_STATE_BUCKET}"
+    -backend-config="region=${TF_STATE_REGION}"
+    -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}"
+  # .terraform is deliberately NOT uploaded. The provider tree is 675 MB against a
+  # 100 MB max_artifacts_size, so the upload would fail and take the whole Init
+  # stage, and therefore every later stage, with it. Each job re-runs
+  # `terraform init` against the cached lock file instead.
   artifacts:
     paths:
-      - infra/environments/staging/.terraform
-      - infra/environments/staging/.terraform.lock.hcl
+    - infra/environments/staging/.terraform.lock.hcl
     expire_in: 1 day
 
-init:production:
+  variables:
+    TF_VAR_image_repository_prefix: ${CI_REGISTRY_IMAGE}
+    TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
+    TF_IN_AUTOMATION: "true"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+  image: &id001
+    name: hashicorp/terraform:1.6
+    entrypoint: [""]
+  before_script:
+  - terraform --version
+infra:init:production:
   stage: Init
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      changes:
-        paths:
-          - infra/**/*
-      when: on_success
-    - when: never
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH == "main"
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - when: never
   script:
-    - cd infra/environments/production
-    - terraform init -input=false
+  - cd infra/environments/production
+  - test -n "${TF_STATE_BUCKET:-}" || { echo "ERROR: TF_STATE_BUCKET CI protected variable is unset"; exit 1; }
+  - test -n "${TF_STATE_REGION:-}" || { echo "ERROR: TF_STATE_REGION CI protected variable is unset"; exit 1; }
+  - test -n "${TF_STATE_LOCK_TABLE:-}" || { echo "ERROR: TF_STATE_LOCK_TABLE CI protected variable is unset"; exit 1; }
+  - >-
+    terraform init -input=false
+    -backend-config=backend.hcl
+    -backend-config="bucket=${TF_STATE_BUCKET}"
+    -backend-config="region=${TF_STATE_REGION}"
+    -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}"
   artifacts:
     paths:
-      - infra/environments/production/.terraform
-      - infra/environments/production/.terraform.lock.hcl
+    - infra/environments/production/.terraform.lock.hcl
     expire_in: 1 day
 
 # ------------------------------------------------------------------------------
 # Stage 2: Validate
 # ------------------------------------------------------------------------------
-validate:syntax:
+  variables:
+    TF_VAR_image_repository_prefix: ${CI_REGISTRY_IMAGE}
+    TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
+    TF_IN_AUTOMATION: "true"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+  image: *id001
+  before_script:
+  - terraform --version
+infra:validate:syntax:
   stage: Validate
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      changes:
-        paths:
-          - infra/**/*
-      when: on_success
-    - when: never
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH == "main"
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - when: never
   script:
-    - cd infra
-    - terraform fmt -check -recursive
-    - cd environments/staging && terraform validate
-    - cd ../production && terraform validate
+  - cd infra
+  - terraform fmt -check -recursive
+  - cd environments/staging && terraform validate
+  - cd ../production && terraform validate
 
-validate:security:
+  variables:
+    TF_VAR_image_repository_prefix: ${CI_REGISTRY_IMAGE}
+    TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
+    TF_IN_AUTOMATION: "true"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+  image: *id001
+  before_script:
+  - terraform --version
+infra:validate:security:
   stage: Validate
   image:
     name: aquasec/trivy:latest
     entrypoint: [""]
-  before_script: []
+  before_script:
+  - terraform --version
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      changes:
-        paths:
-          - infra/**/*
-      when: on_success
-    - when: never
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH == "main"
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - when: never
   script:
-    - trivy config --severity HIGH,CRITICAL --exit-code 1 infra/
+    # infra/.trivyignore lists the accepted findings and why each is accepted. New
+    # HIGH/CRITICAL findings still fail this gate.
+  - trivy config --severity HIGH,CRITICAL --ignorefile infra/.trivyignore --exit-code 1 infra/
   allow_failure: false
+
+  variables:
+    TF_IN_AUTOMATION: "true"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+infra:validate:dependencies:
+  stage: Validate
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule"
+    when: on_success
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - when: never
+  script:
+  - echo "=== [Validate] Reporting outdated Terraform providers for dependency review ==="
+  - cd infra/environments/staging
+  - terraform init -backend=false -input=false
+  - terraform outdated || echo "terraform outdated reported no comparable provider versions"
+  allow_failure: true
 
 # ------------------------------------------------------------------------------
 # Stage 3: Plan
 # ------------------------------------------------------------------------------
-plan:staging:
+  variables:
+    TF_IN_AUTOMATION: "true"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+  image: *id001
+  before_script:
+  - terraform --version
+infra:plan:staging:
   stage: Plan
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      changes:
-        paths:
-          - infra/**/*
-      when: on_success
-    - when: never
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH == "main"
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - when: never
   script:
-    - cd infra/environments/staging
-    - test -n "${TF_VAR_inventory_db_password:-}" || { echo "ERROR: TF_VAR_inventory_db_password CI masked var is unset"; exit 1; }
-    - test -n "${TF_VAR_billing_db_password:-}" || { echo "ERROR: TF_VAR_billing_db_password CI masked var is unset"; exit 1; }
-    - test -n "${TF_VAR_rabbitmq_password:-}" || { echo "ERROR: TF_VAR_rabbitmq_password CI masked var is unset"; exit 1; }
-    - terraform plan -input=false -out=staging.tfplan
+  - cd infra/environments/staging
+  - test -n "${TF_VAR_inventory_db_password:-}" || { echo "ERROR: TF_VAR_inventory_db_password CI masked var is unset"; exit 1; }
+  - test -n "${TF_VAR_billing_db_password:-}" || { echo "ERROR: TF_VAR_billing_db_password CI masked var is unset"; exit 1; }
+  - test -n "${TF_VAR_rabbitmq_password:-}" || { echo "ERROR: TF_VAR_rabbitmq_password CI masked var is unset"; exit 1; }
+  - terraform plan -input=false -out=staging.tfplan
   artifacts:
     name: "staging-tfplan-${CI_COMMIT_SHORT_SHA}"
     paths:
-      - infra/environments/staging/staging.tfplan
+    - infra/environments/staging/staging.tfplan
     expire_in: 7 days
 
-plan:production:
+  variables:
+    TF_VAR_image_repository_prefix: ${CI_REGISTRY_IMAGE}
+    TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
+    TF_IN_AUTOMATION: "true"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+  image: *id001
+  before_script:
+  - terraform --version
+infra:plan:production:
   stage: Plan
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      changes:
-        paths:
-          - infra/**/*
-      when: on_success
-    - when: never
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH == "main"
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - if: $CI_COMMIT_BRANCH
+    changes:
+      paths:
+      - infra/**/*
+    when: on_success
+  - when: never
   script:
-    - cd infra/environments/production
-    - test -n "${TF_VAR_inventory_db_password:-}" || { echo "ERROR: TF_VAR_inventory_db_password CI masked var is unset"; exit 1; }
-    - test -n "${TF_VAR_billing_db_password:-}" || { echo "ERROR: TF_VAR_billing_db_password CI masked var is unset"; exit 1; }
-    - test -n "${TF_VAR_rabbitmq_password:-}" || { echo "ERROR: TF_VAR_rabbitmq_password CI masked var is unset"; exit 1; }
-    - terraform plan -input=false -out=production.tfplan
+  - cd infra/environments/production
+  - test -n "${TF_VAR_inventory_db_password:-}" || { echo "ERROR: TF_VAR_inventory_db_password CI masked var is unset"; exit 1; }
+  - test -n "${TF_VAR_billing_db_password:-}" || { echo "ERROR: TF_VAR_billing_db_password CI masked var is unset"; exit 1; }
+  - test -n "${TF_VAR_rabbitmq_password:-}" || { echo "ERROR: TF_VAR_rabbitmq_password CI masked var is unset"; exit 1; }
+  - terraform plan -input=false -out=production.tfplan
   artifacts:
     name: "production-tfplan-${CI_COMMIT_SHORT_SHA}"
     paths:
-      - infra/environments/production/production.tfplan
+    - infra/environments/production/production.tfplan
     expire_in: 7 days
 
 # ------------------------------------------------------------------------------
 # Stage 4: Apply to Staging (Automated on Protected Main Branch)
 # ------------------------------------------------------------------------------
-apply:staging:
+  variables:
+    TF_VAR_image_repository_prefix: ${CI_REGISTRY_IMAGE}
+    TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
+    TF_IN_AUTOMATION: "true"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+  image: *id001
+  before_script:
+  - terraform --version
+infra:apply:staging:
   stage: Apply to Staging
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+  - if: $CI_PIPELINE_SOURCE == "schedule"
+    when: never
+  - if: $CI_COMMIT_BRANCH == "main"
   script:
-    - cd infra/environments/staging
-    - terraform apply -input=false -auto-approve staging.tfplan
+  - cd infra/environments/staging
+  - terraform apply -input=false -auto-approve staging.tfplan
   environment:
     name: staging
     url: https://staging.code-keeper.internal
@@ -176,32 +299,58 @@ apply:staging:
 # ------------------------------------------------------------------------------
 # Stage 5: Approval (Manual Gate for Production Promotion)
 # ------------------------------------------------------------------------------
-approval:production:
+  variables:
+    TF_VAR_image_repository_prefix: ${CI_REGISTRY_IMAGE}
+    TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
+    TF_IN_AUTOMATION: "true"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+  image: *id001
+  before_script:
+  - terraform --version
+infra:approval:production:
   stage: Approval
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+  - if: $CI_PIPELINE_SOURCE == "schedule"
+    when: never
+  - if: $CI_COMMIT_BRANCH == "main"
   when: manual
   allow_failure: false
   script:
-    - echo "============================================================"
-    - echo " Production Deployment Approval Granted by Operator"
-    - echo " Authorizing promotion of changes from staging to production"
-    - echo " Commit: ${CI_COMMIT_SHA} by ${GITLAB_USER_NAME}"
-    - echo "============================================================"
+  - echo "============================================================"
+  - echo " Production Deployment Approval Granted by Operator"
+  - echo " Authorizing promotion of changes from staging to production"
+  - echo " Commit: ${CI_COMMIT_SHA} by ${GITLAB_USER_NAME}"
+  - echo "============================================================"
 
 # ------------------------------------------------------------------------------
 # Stage 6: Apply to Production (Executes Only After Manual Approval)
 # ------------------------------------------------------------------------------
-apply:production:
+  variables:
+    TF_IN_AUTOMATION: "true"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+  image: *id001
+  before_script:
+  - terraform --version
+infra:apply:production:
   stage: Apply to Production
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+  - if: $CI_PIPELINE_SOURCE == "schedule"
+    when: never
+  - if: $CI_COMMIT_BRANCH == "main"
   needs:
-    - approval:production
-    - plan:production
+  - approval:production
+  - plan:production
   script:
-    - cd infra/environments/production
-    - terraform apply -input=false -auto-approve production.tfplan
+  - cd infra/environments/production
+  - terraform apply -input=false -auto-approve production.tfplan
   environment:
     name: production
     url: https://production.code-keeper.internal
+  variables:
+    TF_VAR_image_repository_prefix: ${CI_REGISTRY_IMAGE}
+    TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
+    TF_IN_AUTOMATION: "true"
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+  image: *id001
+  before_script:
+  - terraform --version

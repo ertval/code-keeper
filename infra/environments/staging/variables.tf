@@ -48,6 +48,12 @@ variable "billing_db_password" {
   sensitive   = true
 }
 
+variable "rabbitmq_username" {
+  description = "RabbitMQ username presented by the gateway and the billing consumer. Must match the broker's admin_username."
+  type        = string
+  default     = "rabbit_user"
+}
+
 variable "rabbitmq_password" {
   description = "RabbitMQ admin password. Set via TF_VAR_rabbitmq_password / CI masked var TF_VAR_rabbitmq_password."
   type        = string
@@ -55,16 +61,50 @@ variable "rabbitmq_password" {
 }
 
 variable "api_gateway_image" {
-  type    = string
-  default = "code-keeper/api-gateway:staging-latest"
+  description = "Full image reference for the API Gateway task; when null it is derived from image_repository_prefix and release_tag."
+  type        = string
+  default     = null
+  nullable    = true
 }
 
 variable "inventory_app_image" {
-  type    = string
-  default = "code-keeper/inventory-app:staging-latest"
+  description = "Full image reference for the Inventory App task; when null it is derived from image_repository_prefix and release_tag."
+  type        = string
+  default     = null
+  nullable    = true
 }
 
 variable "billing_app_image" {
-  type    = string
-  default = "code-keeper/billing-app:staging-latest"
+  description = "Full image reference for the Billing App task; when null it is derived from image_repository_prefix and release_tag."
+  type        = string
+  default     = null
+  nullable    = true
 }
+
+variable "image_repository_prefix" {
+  description = <<-EOT
+    Registry namespace holding the service images, without a trailing slash.
+    No default on purpose: the CI pipelines push to $${CI_REGISTRY_IMAGE}/<service>
+    and export TF_VAR_image_repository_prefix=$${CI_REGISTRY_IMAGE}, so a value
+    is always supplied on the path that matters. The previous default,
+    "code-keeper", was a bare name that resolved to a Docker Hub *user* which
+    does not exist -- a manual `terraform apply` silently produced task
+    definitions pointing at images that were never pushed, and the first
+    revision is seeded once and then guarded by
+    `lifecycle { ignore_changes = [task_definition] }`, so nothing ever
+    corrected it afterwards.
+  EOT
+  type        = string
+
+  validation {
+    condition     = can(regex("^[^/]+/[^/]+$", var.image_repository_prefix))
+    error_message = "image_repository_prefix must be <registry-host>/<namespace> (e.g. registry.example.com/group/project). A bare repository name is ambiguous and previously resolved to a nonexistent Docker Hub user."
+  }
+}
+
+variable "release_tag" {
+  description = "Tag of the service images. Terraform only seeds the first task definition revision; the CD pipeline promotes the immutable commit SHA and owns the running revision, so this value is overridden with TF_VAR_release_tag when the pipeline applies."
+  type        = string
+  default     = "staging-latest"
+}
+
