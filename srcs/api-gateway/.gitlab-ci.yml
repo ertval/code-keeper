@@ -67,12 +67,9 @@ api-gateway:test:unit:
       - srcs/api-gateway/**/*
     when: on_success
   - when: never
-  before_script:
   - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
   - cd "${APP_DIR}"
   - pwd
-  - cd "${APP_DIR}"
-  - pip install --no-cache-dir -r requirements.txt pytest pytest-cov
   script:
   - echo "=== [Test] Running Unit and Integration Test Suite ==="
   - pytest --cov=app --cov-report=term-missing --junitxml=junit-report.xml tests/
@@ -114,12 +111,9 @@ api-gateway:scan:sast_bandit:
       - srcs/api-gateway/**/*
     when: on_success
   - when: never
-  before_script:
   - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
   - cd "${APP_DIR}"
   - pwd
-  - cd "${APP_DIR}"
-  - pip install --no-cache-dir bandit
   script:
   - echo "=== [Scan] Executing Bandit AST Security Analysis ==="
   - bandit -r app/ -ll -ii -f screen
@@ -277,12 +271,9 @@ api-gateway:scan:dependencies:
   - if: $CI_COMMIT_BRANCH
     when: on_success
   - when: never
-  before_script:
   - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
   - cd "${APP_DIR}"
   - pwd
-  - cd "${APP_DIR}"
-  - pip install --no-cache-dir pip-audit
   script:
   - echo "=== [Scan] Reporting dependency advisories against requirements.txt (advisory only) ==="
   - |
@@ -364,7 +355,7 @@ api-gateway:containerize:image_scan:
     when: on_success
   - when: never
   needs:
-  - containerize:docker
+  - api-gateway:containerize:docker
   variables:
     APP_NAME: "api-gateway"
     APP_DIR: "srcs/api-gateway"
@@ -383,13 +374,9 @@ api-gateway:containerize:image_scan:
 # ------------------------------------------------------------------------------
 # Stage 5: Deploy to Staging
 # ------------------------------------------------------------------------------
-  before_script:
-  - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
-  - cd "${APP_DIR}"
-  - pwd
 api-gateway:deploy:staging:
   needs:
-  - job: containerize:docker
+  - job: api-gateway:containerize:docker
     artifacts: false
   stage: Deploy to Staging
   image:
@@ -498,8 +485,8 @@ api-gateway:promote:image:
     when: never
   - if: $CI_COMMIT_BRANCH == "main"
   needs:
-  - approval:production
-  - deploy:staging
+  - api-gateway:approval:production
+  - api-gateway:deploy:staging
   variables:
     APP_NAME: "api-gateway"
     APP_DIR: "srcs/api-gateway"
@@ -534,10 +521,10 @@ api-gateway:deploy:production:
     when: never
   - if: $CI_COMMIT_BRANCH == "main"
   needs:
-  - approval:production
-  - promote:image
-  - deploy:staging
-  - job: containerize:docker
+  - api-gateway:approval:production
+  - api-gateway:promote:image
+  - api-gateway:deploy:staging
+  - job: api-gateway:containerize:docker
     artifacts: false
   environment:
     name: production

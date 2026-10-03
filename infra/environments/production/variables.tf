@@ -97,8 +97,13 @@ variable "image_repository_prefix" {
   type        = string
 
   validation {
-    condition     = can(regex("^[^/]+/[^/]+$", var.image_repository_prefix))
-    error_message = "image_repository_prefix must be <registry-host>/<namespace> (e.g. registry.example.com/group/project). A bare repository name is ambiguous and previously resolved to a nonexistent Docker Hub user."
+    # One or more path segments, so this accepts both registry.example.com/ns
+    # and registry.example.com/group/subgroup/project -- which is what GitLab's
+    # CI_REGISTRY_IMAGE actually is for a group project. A single segment with
+    # no slash (the old "code-keeper" default, a nonexistent Docker Hub user)
+    # is rejected.
+    condition     = can(regex("^[^\\s/]+(?:/[^\\s/]+)+$", var.image_repository_prefix))
+    error_message = "image_repository_prefix must be <registry-host>/<path...> (e.g. registry.example.com/group/project). It must contain at least one slash: a bare name is ambiguous and previously resolved to a nonexistent Docker Hub user."
   }
 }
 

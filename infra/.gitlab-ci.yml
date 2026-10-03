@@ -338,8 +338,8 @@ infra:apply:production:
     when: never
   - if: $CI_COMMIT_BRANCH == "main"
   needs:
-  - approval:production
-  - plan:production
+  - infra:approval:production
+  - infra:plan:production
   script:
   - cd infra/environments/production
   - terraform apply -input=false -auto-approve production.tfplan

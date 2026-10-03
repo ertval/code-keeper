@@ -65,12 +65,9 @@ inventory-app:test:unit:
       - srcs/inventory-app/**/*
     when: on_success
   - when: never
-  before_script:
   - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
   - cd "${APP_DIR}"
   - pwd
-  - cd "${APP_DIR}"
-  - pip install --no-cache-dir -r requirements.txt pytest pytest-cov
   script:
   - echo "=== [Test] Running Unit and Integration Test Suite ==="
   - pytest --cov=app --cov-report=term-missing --junitxml=junit-report.xml tests/
@@ -112,12 +109,9 @@ inventory-app:scan:sast_bandit:
       - srcs/inventory-app/**/*
     when: on_success
   - when: never
-  before_script:
   - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
   - cd "${APP_DIR}"
   - pwd
-  - cd "${APP_DIR}"
-  - pip install --no-cache-dir bandit
   script:
   - echo "=== [Scan] Executing Bandit AST Security Analysis ==="
   - bandit -r app/ -ll -ii -f screen
@@ -275,12 +269,9 @@ inventory-app:scan:dependencies:
   - if: $CI_COMMIT_BRANCH
     when: on_success
   - when: never
-  before_script:
   - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
   - cd "${APP_DIR}"
   - pwd
-  - cd "${APP_DIR}"
-  - pip install --no-cache-dir pip-audit
   script:
   - echo "=== [Scan] Reporting dependency advisories against requirements.txt (advisory only) ==="
   - |
@@ -362,7 +353,7 @@ inventory-app:containerize:image_scan:
     when: on_success
   - when: never
   needs:
-  - containerize:docker
+  - inventory-app:containerize:docker
   variables:
     APP_NAME: "inventory-app"
     APP_DIR: "srcs/inventory-app"
@@ -381,13 +372,9 @@ inventory-app:containerize:image_scan:
 # ------------------------------------------------------------------------------
 # Stage 5: Deploy to Staging
 # ------------------------------------------------------------------------------
-  before_script:
-  - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
-  - cd "${APP_DIR}"
-  - pwd
 inventory-app:deploy:staging:
   needs:
-  - job: containerize:docker
+  - job: inventory-app:containerize:docker
     artifacts: false
   stage: Deploy to Staging
   image:
@@ -496,8 +483,8 @@ inventory-app:promote:image:
     when: never
   - if: $CI_COMMIT_BRANCH == "main"
   needs:
-  - approval:production
-  - deploy:staging
+  - inventory-app:approval:production
+  - inventory-app:deploy:staging
   variables:
     APP_NAME: "inventory-app"
     APP_DIR: "srcs/inventory-app"
@@ -532,10 +519,10 @@ inventory-app:deploy:production:
     when: never
   - if: $CI_COMMIT_BRANCH == "main"
   needs:
-  - approval:production
-  - promote:image
-  - deploy:staging
-  - job: containerize:docker
+  - inventory-app:approval:production
+  - inventory-app:promote:image
+  - inventory-app:deploy:staging
+  - job: inventory-app:containerize:docker
     artifacts: false
   environment:
     name: production
