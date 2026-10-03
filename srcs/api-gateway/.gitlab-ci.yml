@@ -38,8 +38,8 @@ api-gateway:build:package:
   variables:
     APP_NAME: "api-gateway"
     APP_DIR: "srcs/api-gateway"
-    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
@@ -86,8 +86,8 @@ api-gateway:test:unit:
   variables:
     APP_NAME: "api-gateway"
     APP_DIR: "srcs/api-gateway"
-    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
@@ -122,8 +122,8 @@ api-gateway:scan:sast_bandit:
   variables:
     APP_NAME: "api-gateway"
     APP_DIR: "srcs/api-gateway"
-    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
@@ -157,8 +157,8 @@ api-gateway:scan:secret_detection:
   variables:
     APP_NAME: "api-gateway"
     APP_DIR: "srcs/api-gateway"
-    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
@@ -196,8 +196,8 @@ api-gateway:scan:trivy_fs:
   variables:
     APP_NAME: "api-gateway"
     APP_DIR: "srcs/api-gateway"
-    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
@@ -249,8 +249,8 @@ api-gateway:scan:sonarqube:
   variables:
     APP_NAME: "api-gateway"
     APP_DIR: "srcs/api-gateway"
-    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
@@ -294,8 +294,8 @@ api-gateway:scan:dependencies:
   variables:
     APP_NAME: "api-gateway"
     APP_DIR: "srcs/api-gateway"
-    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
@@ -315,8 +315,8 @@ api-gateway:containerize:docker:
   variables:
     APP_NAME: "api-gateway"
     APP_DIR: "srcs/api-gateway"
-    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
@@ -326,7 +326,7 @@ api-gateway:containerize:docker:
   - cd "${APP_DIR}"
   - pwd
   - mkdir -p "${DOCKER_CONFIG}"
-  - printf '{{"auths":{{"{0}":{{"username":"{1}","password":"{2}"}}}}}}' "${CI_REGISTRY}" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" > "${DOCKER_CONFIG}/config.json"
+  - printf '{{"auths":{{"https://index.docker.io/v1/":{{"username":"{0}","password":"{1}"}}}}}}' "${DOCKERHUB_USERNAME}" "${DOCKERHUB_TOKEN}" > "${DOCKER_CONFIG}/config.json"
   script:
   - echo "=== [Containerization] Building Docker Image with Kaniko (no privileged runner required) ==="
     # Pre-flight: kaniko resolves a relative --dockerfile against the build context, so
@@ -359,13 +359,13 @@ api-gateway:containerize:image_scan:
   variables:
     APP_NAME: "api-gateway"
     APP_DIR: "srcs/api-gateway"
-    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
-    TRIVY_USERNAME: "${CI_REGISTRY_USER}"
-    TRIVY_PASSWORD: "${CI_REGISTRY_PASSWORD}"
+    TRIVY_USERNAME: "${DOCKERHUB_USERNAME}"
+    TRIVY_PASSWORD: "${DOCKERHUB_TOKEN}"
   script:
   - echo "=== [Containerization] Scanning published image ${IMAGE_TAG} with Trivy ==="
   - trivy image --severity HIGH,CRITICAL --exit-code 1 "${IMAGE_TAG}"
@@ -392,8 +392,8 @@ api-gateway:deploy:staging:
   variables:
     APP_NAME: "api-gateway"
     APP_DIR: "srcs/api-gateway"
-    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
@@ -410,8 +410,8 @@ api-gateway:deploy:staging:
   - echo "=== [CD] Deploying ${APP_NAME} to Staging Environment ==="
   - echo "=== [CD] Verifying ${TARGET_IMAGE} exists in the registry before touching the task definition ==="
   - |
-    if ! printf '%s' "${CI_REGISTRY_PASSWORD}" | crane auth login "${CI_REGISTRY}" -u "${CI_REGISTRY_USER}" --password-stdin >/dev/null 2>&1; then
-      echo "ERROR: cannot authenticate to ${CI_REGISTRY}; refusing to mutate ${TASK_FAMILY}"; exit 1
+    if ! printf '%s' "${DOCKERHUB_TOKEN}" | crane auth login "index.docker.io" -u "${DOCKERHUB_USERNAME}" --password-stdin >/dev/null 2>&1; then
+      echo "ERROR: cannot authenticate to Docker Hub; refusing to mutate ${TASK_FAMILY}"; exit 1
     fi
   - crane digest "${TARGET_IMAGE}" >/dev/null 2>&1 || { echo "ERROR: ${TARGET_IMAGE} is not in the registry (was it built on this commit?); refusing to point ${TASK_FAMILY} at a missing image"; exit 1; }
   - echo "=== [CD] Verifying ${TARGET_IMAGE} exists in the registry before touching the task definition ==="
@@ -466,8 +466,8 @@ api-gateway:approval:production:
   variables:
     APP_NAME: "api-gateway"
     APP_DIR: "srcs/api-gateway"
-    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
@@ -490,8 +490,8 @@ api-gateway:promote:image:
   variables:
     APP_NAME: "api-gateway"
     APP_DIR: "srcs/api-gateway"
-    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
@@ -501,7 +501,7 @@ api-gateway:promote:image:
   - cd "${APP_DIR}"
   - pwd
   - mkdir -p "${DOCKER_CONFIG}"
-  - printf '{"auths":{"%s":{"username":"%s","password":"%s"}}}' "${CI_REGISTRY}" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" > "${DOCKER_CONFIG}/config.json"
+  - printf '{"auths":{"https://index.docker.io/v1/":{"username":"%s","password":"%s"}}}' "${DOCKERHUB_USERNAME}" "${DOCKERHUB_TOKEN}" > "${DOCKER_CONFIG}/config.json"
   script:
   - echo "=== [CD] Promoting ${IMAGE_TAG} to the ${IMAGE_PROD} release alias ==="
   - crane copy "${IMAGE_TAG}" "${IMAGE_PROD}"
@@ -532,8 +532,8 @@ api-gateway:deploy:production:
   variables:
     APP_NAME: "api-gateway"
     APP_DIR: "srcs/api-gateway"
-    IMAGE_TAG: "${CI_REGISTRY_IMAGE}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${CI_REGISTRY_IMAGE}/${APP_NAME}:production-latest"
+    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"

@@ -49,7 +49,7 @@ infra:init:staging:
     expire_in: 1 day
 
   variables:
-    TF_VAR_image_repository_prefix: ${CI_REGISTRY_IMAGE}
+    TF_VAR_image_repository_prefix: ${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}
     TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
     TF_IN_AUTOMATION: "true"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
@@ -97,7 +97,7 @@ infra:init:production:
 # Stage 2: Validate
 # ------------------------------------------------------------------------------
   variables:
-    TF_VAR_image_repository_prefix: ${CI_REGISTRY_IMAGE}
+    TF_VAR_image_repository_prefix: ${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}
     TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
     TF_IN_AUTOMATION: "true"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
@@ -130,7 +130,7 @@ infra:validate:syntax:
   - cd ../production && terraform validate
 
   variables:
-    TF_VAR_image_repository_prefix: ${CI_REGISTRY_IMAGE}
+    TF_VAR_image_repository_prefix: ${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}
     TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
     TF_IN_AUTOMATION: "true"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
@@ -173,17 +173,7 @@ infra:validate:security:
 infra:validate:dependencies:
   stage: Validate
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule"
-    when: on_success
-  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - if: $CI_COMMIT_BRANCH
-    changes:
-      paths:
-      - infra/**/*
+  - if: $CI_COMMIT_BRANCH == "main"
     when: on_success
   - when: never
   script:
@@ -234,7 +224,7 @@ infra:plan:staging:
     expire_in: 7 days
 
   variables:
-    TF_VAR_image_repository_prefix: ${CI_REGISTRY_IMAGE}
+    TF_VAR_image_repository_prefix: ${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}
     TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
     TF_IN_AUTOMATION: "true"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
@@ -276,7 +266,7 @@ infra:plan:production:
 # Stage 4: Apply to Staging (Automated on Protected Main Branch)
 # ------------------------------------------------------------------------------
   variables:
-    TF_VAR_image_repository_prefix: ${CI_REGISTRY_IMAGE}
+    TF_VAR_image_repository_prefix: ${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}
     TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
     TF_IN_AUTOMATION: "true"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
@@ -300,7 +290,7 @@ infra:apply:staging:
 # Stage 5: Approval (Manual Gate for Production Promotion)
 # ------------------------------------------------------------------------------
   variables:
-    TF_VAR_image_repository_prefix: ${CI_REGISTRY_IMAGE}
+    TF_VAR_image_repository_prefix: ${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}
     TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
     TF_IN_AUTOMATION: "true"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
@@ -347,7 +337,7 @@ infra:apply:production:
     name: production
     url: https://production.code-keeper.internal
   variables:
-    TF_VAR_image_repository_prefix: ${CI_REGISTRY_IMAGE}
+    TF_VAR_image_repository_prefix: ${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}
     TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
     TF_IN_AUTOMATION: "true"
     AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"

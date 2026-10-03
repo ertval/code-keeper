@@ -34,7 +34,7 @@
     │ Private Application Subnets (AWS VPC)                                  │
     │                                                                        │
     │  ┌──────────────────────┐                     ┌──────────────────────┐ │
-    │  │   api-gateway-app    │── HTTP /api/movies ─►│    inventory-app     │ │
+    │  │   api-gateway    │── HTTP /api/movies ─►│    inventory-app     │ │
     │  │ (Waitress/Flask:3000)│                     │ (Waitress/Flask:8080)│ │
     │  └──────────┬───────────┘                     └──────────┬───────────┘ │
     │             │                                            │             │
