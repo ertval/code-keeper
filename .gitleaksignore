@@ -1,0 +1,19 @@
+# Fingerprints suppressed from `gitleaks detect`, with the reason for each.
+#
+# An audit tool that documents the secret signatures it hunts for has to
+# contain those signatures verbatim, so its own source file trips its own
+# scanner. That is self-referential noise, not a leak: the entry below is the
+# `STATIC_LEAK_PATTERNS` array in scripts/verify_security.sh, which lists the
+# signatures it searches for (PEM private-key headers, AWS access-key ids, ...).
+# Nothing else in that file is suppressed, and no application code is excluded.
+#
+# Note for editors: do NOT quote a full pattern verbatim in this file. It is
+# scanned by verify_security.sh's static leak-pattern check, which does not
+# exempt .gitleaksignore, so reproducing a signature here would reintroduce the
+# very finding this file exists to suppress.
+#
+# Keep this in sync with LEAK_SCAN_EXCLUSIONS in scripts/verify_security.sh,
+# which excludes the same audit artefacts from the static leak-pattern scan.
+#
+# Fingerprint format: <path>:<rule-id>:<line>
+scripts/verify_security.sh:private-key:219
