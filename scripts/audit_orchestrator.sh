@@ -329,10 +329,10 @@ CATALOGUE=(
   "CYB2-ENV-SOURCED|cyb2.env|106|separated-credentials-from-code|Infrastructure credentials come from env/CI variables, never literals|E"
   "CYB3-DOCKER|cyb3.docker|108|least-privilege-principle|Container images run as non-root (last USER directive wins)|E"
   "CYB3-SG-EXPOSURE|cyb3.sgrules|108|least-privilege-principle|No sensitive port exposed to 0.0.0.0/0 or ::/0 (ranges + IPv6)|E"
-  "CYB3-SG-DATASTORE|cyb3.sgdata|108|least-privilege-principle|Data-store rules reference internal SGs only, never CIDRs|E"
+  "CYB3-SG-DATASTORE|cyb3.sgdata|108|least-privilege-principle|Data-store ingress is peer-SG only (world-open CIDR on a data-store port rejected); outbound CIDR inventoried|E"
   "CYB3-SG-GAPS|cyb3.sggaps|108|least-privilege-principle|Unmanaged SG directions inventoried (rabbitmq/database egress, billing ingress)|E"
   "CYB3-RDS|cyb3.rds|108|least-privilege-principle|RDS instances are private and storage-encrypted (least-privilege data tier)|"
-  "CYB3-NEGATIVE|cyb3.fixture|108|least-privilege-principle|Negative control: SG opening 5432 to 0.0.0.0/0 is rejected|E"
+  "CYB3-NEGATIVE|cyb3.fixture|108|least-privilege-principle|Negative control: world-open data-store ingress (5432, 5672/15672) rejected, peer-SG-only store accepted|E"
   "CYB4-FILE|cyb4.file|110|process-for-updating-dependencies|.github/dependabot.yml exists and parses|"
   "CYB4-COVERAGE|cyb4.coverage|110|process-for-updating-dependencies|Dependabot covers every dependency manifest present in the repo|E"
   "CYB4-TERRAFORM-EFFECTIVE|cyb4.terraformroot|110|process-for-updating-dependencies|Terraform ecosystem entry is effective, not a silent no-op|E"
@@ -363,6 +363,7 @@ py_analyze() {
 import glob
 import json
 import os
+import fnmatch
 import re
 import sys
 
@@ -434,8 +435,57 @@ def load_ci(path):
         return None, "YAML parse error: %s" % str(exc).splitlines()[0]
 
 
+# GitLab resolves exactly ONE CI entry point: .gitlab-ci.yml at the repository
+# root. The files under infra/ and srcs/ are `include:` fragments, and the
+# singleton keys GitLab will not merge for them (stages, workflow, default,
+# variables) live in the root file. Reading a fragment in isolation therefore
+# understates it: a fragment that declares no `stages:` is not stage-less, it
+# inherits the root's union list. hoist_singletons() reconstructs the effective
+# view the runner actually sees, so a control can never fail a fragment merely
+# for delegating a singleton to the root.
+ROOT_CI = ".gitlab-ci.yml"
+HOISTED = ("stages", "workflow", "default")
+
+
+def load_root_ci():
+    return load_ci(R(ROOT_CI))
+
+
+def hoist_singletons(data):
+    """Fill hoisted singleton keys from the root entry point when a fragment omits them."""
+    if not isinstance(data, dict):
+        return data
+    missing = [k for k in HOISTED if k not in data]
+    if not missing:
+        return data
+    root, err = load_root_ci()
+    if err or not isinstance(root, dict):
+        return data
+    for k in missing:
+        if k in root:
+            data[k] = root[k]
+    return data
+
+
 def load_infra_ci():
-    return load_ci(R("infra", ".gitlab-ci.yml"))
+    data, err = load_ci(R("infra", ROOT_CI))
+    return (hoist_singletons(data), err) if not err else (data, err)
+
+
+def stages_subset(actual, required):
+    """True when `required` appears in `actual` in the same relative order."""
+    if not isinstance(actual, list):
+        return False
+    pos, last = [], -1
+    for stage in required:
+        if stage not in actual:
+            return False
+        idx = actual.index(stage)
+        if idx < last:
+            return False
+        last = idx
+        pos.append(idx)
+    return True
 
 
 def jobs(data):
@@ -463,6 +513,27 @@ def image_name(job):
 
 def stage_jobs(data, stage):
     return {k: v for k, v in jobs(data).items() if v.get("stage") == stage}
+
+
+def need_names(job):
+    """The job names a job declares in `needs:`, as plain strings."""
+    out = []
+    for n in job.get("needs") or []:
+        out.append(str(n.get("job", n)) if isinstance(n, dict) else str(n))
+    return out
+
+
+def needs_segment(job, segment):
+    """True when a job needs one whose ':'-delimited name segment matches.
+
+    Job names are namespaced per service now that four fragments share one
+    namespace (`api-gateway:approval:production`, `infra:approval:production`),
+    so matching a dependency by string prefix silently stops finding the gate.
+    Both the infra and the microservice production gates go through this helper
+    so they cannot drift apart again.
+    """
+    return any(seg == segment or seg.startswith(segment)
+               for n in need_names(job) for seg in n.split(":"))
 
 
 PROTECTED_RE = re.compile(
@@ -504,10 +575,23 @@ def workflow_protected(data):
 
 
 def scan_tools_used(job):
+    """Scanner invocations in a job's script.
+
+    A tool counts when it appears in *command position*. The prefix is anchored
+    to a line start or a command separator, optionally followed by the shell
+    control words that also start a command (`if`, `then`, `do`, ...), `sudo`,
+    and a relative path. Anchoring this way is deliberate: it must match
+    `if pip-audit -r requirements.txt` (a real advisory scan wrapped in a
+    conditional) while still refusing a scanner name that only appears inside
+    prose or inside an echo'd string.
+    """
     text = script_text(job).lower()
     hits = []
     for tool in SCAN_TOOLS:
-        if re.search(r"(^|[\n;&|]\s*)(sudo\s+)?[a-z0-9_.-]*" + re.escape(tool) + r"\b", text):
+        pat = (r"(?:^|[\n;&|(`]|\b(?:if|then|else|elif|do|while|until|not)\b)"
+               r"\s*(?:sudo\s+)?(?:[a-z0-9_.-]+/)*[a-z0-9_.-]*"
+               + re.escape(tool) + r"\b")
+        if re.search(pat, text):
             hits.append(tool)
     return hits
 
@@ -950,7 +1034,7 @@ def h_runner_tags():
     if not HAVE_YAML:
         return no_yaml("RUNNER-TAGS")
     for svc in services():
-        data, err = load_ci(R("srcs", svc, ".gitlab-ci.yml"))
+        data, err = load_ci(R("srcs", svc, ROOT_CI))
         if err or not isinstance(data, dict):
             offenders.append("%s: %s" % (svc, err or "not a mapping"))
             continue
@@ -992,11 +1076,14 @@ def h_infra_stages():
     if err:
         return emit("INFRA-STAGES", "FAIL", "infra/.gitlab-ci.yml unreadable: %s" % err)
     actual = data.get("stages") or []
-    if actual == INFRA_STAGES:
-        emit("INFRA-STAGES", "PASS", "stages: %s" % " -> ".join(actual))
+    if stages_subset(actual, INFRA_STAGES):
+        emit("INFRA-STAGES", "PASS",
+             "the six required stages are declared in order (effective list: %s)"
+             % " -> ".join(actual))
     else:
         emit("INFRA-STAGES", "FAIL",
-             "stage list mismatch; expected %s got %s" % (INFRA_STAGES, actual))
+             "stage list mismatch; expected %s (in order, anywhere in the effective "
+             "list) got %s" % (INFRA_STAGES, actual))
 
 
 def h_infra_stagejobs():
@@ -1034,9 +1121,8 @@ def h_infra_gate():
     if not prod:
         problems.append("no job in the Apply to Production stage")
     for name in prod:
-        needs = jobs(data)[name].get("needs") or []
-        names = [n.get("job", n) if isinstance(n, dict) else n for n in needs]
-        if not any(str(n).startswith("approval") for n in names):
+        job = jobs(data)[name]
+        if not needs_segment(job, "approval"):
             problems.append("%s does not need an approval job" % name)
     if problems:
         emit("INFRA-GATE", "FAIL", "; ".join(problems))
@@ -1140,12 +1226,12 @@ def for_each_service(prefix, fn):
         emit(prefix, "FAIL", "no microservice pipelines discovered under srcs/ (precondition empty)")
         return
     for svc in svcs:
-        data, err = load_ci(R("srcs", svc, ".gitlab-ci.yml"))
+        data, err = load_ci(R("srcs", svc, ROOT_CI))
         cid = "%s/%s" % (prefix, svc)
         if err:
             emit(cid, "FAIL", "%s: %s" % (svc, err))
             continue
-        fn(cid, svc, data)
+        fn(cid, svc, hoist_singletons(data))
 
 
 CI_STAGES = ["Build", "Test", "Scan", "Containerization", "Deploy to Staging",
@@ -1155,10 +1241,14 @@ CI_STAGES = ["Build", "Test", "Scan", "Containerization", "Deploy to Staging",
 def h_ci_stages():
     def one(cid, svc, data):
         actual = data.get("stages") or []
-        if actual == CI_STAGES:
-            emit(cid, "PASS", "%s: stages = %s" % (svc, " -> ".join(actual)))
+        if stages_subset(actual, CI_STAGES):
+            emit(cid, "PASS",
+                 "%s: the seven CI/CD stages are declared in order (effective list: %s)"
+                 % (svc, " -> ".join(actual)))
         else:
-            emit(cid, "FAIL", "%s: expected %s got %s" % (svc, CI_STAGES, actual))
+            emit(cid, "FAIL",
+                 "%s: expected %s (in order, anywhere in the effective list) got %s"
+                 % (svc, CI_STAGES, actual))
     for_each_service("CI-STAGES", one)
 
 
@@ -1223,14 +1313,25 @@ def h_ci_container():
             emit(cid, "FAIL", "%s: no Containerization-stage job" % svc)
             return
         problems = []
+        # Split the stage by role. In an unprivileged pipeline the build and the
+        # push are the same job (Kaniko writes straight to the registry and needs
+        # no Docker daemon), so demanding `docker build` in every job would reject
+        # the least-privilege design the runner is actually configured for.
+        builders, scanners = [], []
         for name, job in cont.items():
-            text = script_text(job)
-            if "docker build" not in text and "buildx" not in text:
-                problems.append("%s never builds an image" % name)
-            if "docker push" not in text:
-                problems.append("%s never pushes to a registry" % name)
-            if not re.search(r"trivy|grype|syft|snyk|hadolint", text):
-                problems.append("%s does not scan the built image" % name)
+            (scanners if re.search(r"trivy|grype|syft|snyk|hadolint", script_text(job))
+             else builders).append(name)
+        if not builders:
+            problems.append("no job in the stage builds/pushes an image")
+        else:
+            for name in builders:
+                text = script_text(cont[name])
+                if not re.search(r"docker\s+(build|push)|buildx|kaniko/executor|buildah|podman\s+build|nerdctl\s+build", text):
+                    problems.append("%s never builds an image" % name)
+                if not re.search(r"docker\s+push|buildx\s+--push|kaniko/executor|--destination|podman\s+push|nerdctl\s+push|crane\s+copy", text):
+                    problems.append("%s never pushes to a registry" % name)
+        if not scanners:
+            problems.append("no job in the stage scans the built image")
         if problems:
             emit(cid, "FAIL", "%s: %s" % (svc, "; ".join(problems)))
         else:
@@ -1304,11 +1405,11 @@ def h_cd_gate():
             return
         problems = []
         for name, job in prod.items():
-            needs = job.get("needs") or []
-            names = [str(n.get("job", n)) if isinstance(n, dict) else str(n) for n in needs]
-            if not any(n.startswith("approval") for n in names):
+            # Both gates go through needs_segment(): a production job must depend
+            # on the manual approval job and on the staging deployment.
+            if not needs_segment(job, "approval"):
                 problems.append("%s does not need the approval job" % name)
-            if not any("staging" in n for n in names):
+            if not any("staging" in n for n in need_names(job)):
                 problems.append("%s does not depend on the staging deployment" % name)
         if problems:
             emit(cid, "FAIL", "%s: %s" % (svc, "; ".join(problems)))
@@ -1344,15 +1445,29 @@ def h_cd_zerodowntime():
     def one(cid, svc, data):
         prod = stage_jobs(data, "Deploy to Production")
         problems, evidence = [], []
+        # A release may legitimately be split across the stage: one job moves the
+        # immutable tag onto the `production-latest` registry alias (no workload
+        # traffic, so there is nothing to roll or to wait on) and a separate job
+        # rolls the running service. Zero-downtime is a property of the release
+        # *path*, so require a rolling deploy + health gate somewhere in the stage
+        # and require every job that actually changes running workloads to have both.
+        rolling, gated = [], []
         for name, job in prod.items():
             text = script_text(job)
-            rolling = bool(re.search(r"force-new-deployment|rollingUpdate|--max-unavailable|update-service", text))
-            wait = bool(re.search(r"services-stable|wait |health|--retry", text))
-            if not rolling:
-                problems.append("%s has no rolling/force-new-deployment mechanism" % name)
-            if not wait:
-                problems.append("%s does not wait for health/stability" % name)
-            evidence.append("%s: rolling=%s health-gate=%s" % (name, rolling, wait))
+            is_roll = bool(re.search(r"force-new-deployment|rollingUpdate|--max-unavailable|update-service|kubectl\s+(rollout|set\s+image)|helm\s+upgrade", text))
+            has_roll = is_roll or bool(re.search(r"rollingUpdate|minimumHealthyPercent|force-new-deployment", json.dumps(job)))
+            has_wait = bool(re.search(r"services-stable|\bwait\b|health|--retry|deployment-status|rollout status", text))
+            if has_roll:
+                rolling.append(name)
+            if is_roll:
+                gated.append(name)
+            if is_roll and not has_wait:
+                problems.append("%s rolls the workload but does not wait for health/stability" % name)
+            evidence.append("%s: rolling=%s health-gate=%s" % (name, has_roll, has_wait))
+        if not rolling:
+            problems.append("no job in the stage performs a rolling/force-new-deployment")
+        elif not gated:
+            problems.append("no rolling job waits for health/stability")
         if problems:
             emit(cid, "FAIL", "%s: %s" % (svc, "; ".join(problems)), evidence)
         else:
@@ -1397,6 +1512,53 @@ resource "aws_security_group" "database" {
   }
 }
 """
+
+# The broker regression the data-store control must also catch: 5672 (AMQP) and
+# 15672 (management UI) are both in SENSITIVE_PORTS, in IPv4 and IPv6 form.
+OPEN_AMQP_SG = """
+resource "aws_security_group" "rabbitmq" {
+  name = "x"
+  ingress {
+    from_port   = 5672
+    to_port     = 5672
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    from_port         = 15672
+    to_port           = 15672
+    protocol          = "tcp"
+    ipv6_cidr_blocks  = ["::/0"]
+  }
+}
+"""
+
+# The shape infra/modules/security_groups/main.tf actually uses: peer-SG ingress
+# plus an outbound 443 path through NAT. Must be accepted, otherwise the control
+# would fail on the documented design instead of on a real exposure.
+TIGHT_SG = """
+resource "aws_security_group" "database" {
+  name = "x"
+  ingress {
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.inventory_app.id]
+  }
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+"""
+
+SG_FIXTURES = (
+    ("database SG opening 5432 to 0.0.0.0/0", OPEN_SG, True, True),
+    ("rabbitmq SG opening 5672 to 0.0.0.0/0 and 15672 to ::/0", OPEN_AMQP_SG, True, True),
+    ("database SG peer-SG only with an outbound 443 to 0.0.0.0/0", TIGHT_SG, False, False),
+)
 
 
 def fixture(cid, yaml_text, call, expect_ok, describe):
@@ -1551,7 +1713,7 @@ def h_func_apply():
                 problems.append("no job applies infra/environments/%s" % env)
     deploys = 0
     for svc in services():
-        data, err = load_ci(R("srcs", svc, ".gitlab-ci.yml"))
+        data, err = load_ci(R("srcs", svc, ROOT_CI))
         if err:
             problems.append("%s: %s" % (svc, err))
             continue
@@ -1672,33 +1834,141 @@ def h_cyb3_sgrules():
              detail)
 
 
+DATASTORE_SG = re.compile(r"database|rabbit|rds|broker|db")
+# Why the data stores keep an outbound rule to the internet, so the control can
+# inventory it with a justification instead of merely tolerating it.
+EGRESS_PURPOSE = {
+    53: "DNS to the VPC resolver",
+    80: "instance metadata service",
+    443: "HTTPS to CloudWatch Logs / registry through NAT",
+}
+
+
+def rule_label(rule):
+    proto = str(rule.get("protocol") or "")
+    span = port_span(rule)
+    if proto == "-1" or span == (0, 0):
+        return "all ports (protocol %s)" % (proto or "-1")
+    if span is None:
+        return "ports %s-%s (range unresolvable)" % (rule.get("from_port"), rule.get("to_port"))
+    return "ports %d-%d" % span
+
+
+def rule_peers(rule):
+    return sorted({s.strip() for s in
+                   re.findall(r"aws_security_group\.([\w-]+)", rule.get("security_groups") or "")})
+
+
+def rule_cidrs(rule):
+    return " / ".join(str(rule[k]) for k in ("cidr_blocks", "ipv6_cidr_blocks") if rule.get(k))
+
+
+def sensitive_in(rule):
+    """SENSITIVE_PORTS the rule range covers; None when the range is unknown.
+
+    Deliberately the same set CYB3-SG-EXPOSURE uses: if 5672 or 15672 were ever
+    opened to the world both controls have to fire, never only one of them.
+    """
+    span = port_span(rule)
+    if span is None:
+        return None
+    if str(rule.get("protocol")) == "-1" or span == (0, 0):
+        return sorted(SENSITIVE_PORTS)
+    return sorted(p for p in SENSITIVE_PORTS if span[0] <= p <= span[1])
+
+
+def fmt_ports(ports):
+    head = ", ".join(str(p) for p in ports[:4])
+    return head + (", ..." if len(ports) > 4 else "")
+
+
+def datastore_sg_findings(groups):
+    """Return (violations, inventory) for the data-store security groups.
+
+    Least privilege on a data store is about who can *reach* it, so the direction
+    of a rule decides how it is judged:
+
+    * INGRESS + world-open CIDR covering a data-store port (or an unresolvable
+      range, from which exclusion cannot be proven) -> violation: the internet
+      can query the store.
+    * INGRESS + world-open CIDR on some other port, or a private CIDR ->
+      inventoried, not failed: no data-store port becomes reachable.
+    * INGRESS with neither peer SG nor CIDR -> violation: the rule is
+      meaningless as written.
+    * EGRESS cannot admit inbound traffic, so a world-open CIDR there is the
+      outbound path every tier needs (NAT for CloudWatch Logs and image pulls,
+      the VPC resolver, IMDS, cluster replication) and is inventoried with its
+      purpose. Only a blanket egress (protocol -1/all to 0.0.0.0/0, i.e. an
+      unrestricted pivot) is a violation.
+    """
+    violations, inventory = [], []
+    for name, spec in sorted(groups.items()):
+        if not DATASTORE_SG.search(name):
+            continue
+        if not spec["ingress"] and not spec["egress"]:
+            violations.append("%s declares no ingress/egress rule at all" % name)
+            continue
+        for rule in spec["ingress"]:
+            label, cidrs, peers = rule_label(rule), rule_cidrs(rule), rule_peers(rule)
+            if world_open(rule):
+                sensitive = sensitive_in(rule)
+                if sensitive is None:
+                    violations.append("%s ingress: %s from 0.0.0.0/0, port range unresolvable so "
+                                      "exclusion of a data-store port cannot be proven" % (name, label))
+                elif sensitive:
+                    violations.append("%s ingress: %s from 0.0.0.0/0 reaches data-store port(s) %s"
+                                      % (name, label, fmt_ports(sensitive)))
+                else:
+                    inventory.append("%s ingress: %s from 0.0.0.0/0 (%s), no data-store port exposed"
+                                     % (name, label, cidrs))
+            elif cidrs:
+                inventory.append("%s ingress: %s from %s, internal range only"
+                                 % (name, label, cidrs))
+            if not peers and not cidrs:
+                violations.append("%s has an ingress rule with neither peer SG nor CIDR" % name)
+        for rule in spec["egress"]:
+            label, cidrs, peers = rule_label(rule), rule_cidrs(rule), rule_peers(rule)
+            span = port_span(rule)
+            if world_open(rule) and (str(rule.get("protocol")) == "-1" or span == (0, 0)):
+                violations.append("%s egress: %s to 0.0.0.0/0 is an unrestricted outbound pivot"
+                                  % (name, label))
+            elif world_open(rule):
+                purpose = ", ".join(EGRESS_PURPOSE.get(p, "outbound call")
+                                    for p in (span or ()) if p in EGRESS_PURPOSE) or "outbound call"
+                inventory.append("%s egress: %s to 0.0.0.0/0 for %s, outbound only so it admits nothing"
+                                 % (name, label, purpose))
+            elif peers:
+                inventory.append("%s egress: %s to peer SG(s) %s"
+                                 % (name, label, ", ".join(peers)))
+            elif cidrs:
+                inventory.append("%s egress: %s to %s, inside the VPC" % (name, label, cidrs))
+            if not peers and not cidrs:
+                violations.append("%s has an egress rule with neither peer SG nor CIDR" % name)
+    return violations, inventory
+
+
 def h_cyb3_sgdata():
     groups = {}
     for p in sg_files():
         groups.update(parse_security_groups(p))
-    problems, detail = [], []
-    for name, spec in sorted(groups.items()):
-        if not re.search(r"database|rabbit|rds|broker|db", name):
-            continue
-        rules = spec["ingress"] + spec["egress"]
-        if not rules:
-            problems.append("%s declares no ingress/egress rule at all" % name)
-            continue
-        for rule in rules:
-            if rule.get("cidr_blocks") and "0.0.0.0/0" in rule["cidr_blocks"]:
-                problems.append("%s allows CIDR access (%s)" % (name, rule.get("cidr_blocks")))
-            if not rule.get("security_groups") and not rule.get("cidr_blocks"):
-                problems.append("%s has a rule with neither peer SG nor CIDR" % name)
-        detail.append("%s: %d rules, peers=%s" % (
-            name, len(rules),
-            sorted({s.strip() for r in rules for s in re.findall(r"aws_security_group\.([\w-]+)", r.get("security_groups") or "")})))
-    if not any(re.search(r"database|rabbit", n) for n in groups):
+    if not any(DATASTORE_SG.search(n) for n in groups):
         return emit("CYB3-SG-DATASTORE", "FAIL", "no data-store security group parsed (precondition empty)")
+    problems, inventory = datastore_sg_findings(groups)
+    detail = []
+    for name in sorted(n for n in groups if DATASTORE_SG.search(n)):
+        spec = groups[name]
+        ingress_peers = sorted({p for r in spec["ingress"] for p in rule_peers(r)})
+        detail.append("%s: %d ingress (peers=%s) + %d egress; %d CIDR rule(s) inventoried below"
+                      % (name, len(spec["ingress"]), ", ".join(ingress_peers) or "none",
+                         len(spec["egress"]),
+                         sum(1 for d in ("ingress", "egress") for r in spec[d] if rule_cidrs(r))))
+    detail += inventory
     if problems:
         emit("CYB3-SG-DATASTORE", "FAIL", "; ".join(problems), detail)
     else:
         emit("CYB3-SG-DATASTORE", "PASS",
-             "database/broker rules are peer-SG only", detail)
+             "data-store ingress is peer-SG only; %d CIDR rule(s) inventoried as outbound-only or "
+             "non data-store-port" % len(inventory), detail)
 
 
 def h_cyb3_sggaps():
@@ -1753,16 +2023,36 @@ def h_cyb3_rds():
 
 
 def h_cyb3_fixture():
-    if not OPEN_SG.strip():
+    if not SG_FIXTURES or not any(t.strip() for _d, t, _v, _e in SG_FIXTURES):
         return emit("CYB3-NEGATIVE", "FAIL", "fixture not built")
-    groups = parse_security_groups_from_text(OPEN_SG)
-    findings, _public, _unknown = exposed_sensitive(groups)
-    if findings:
-        emit("CYB3-NEGATIVE", "PASS",
-             "fixture SG (5432 open to 0.0.0.0/0) correctly flagged: %s" % findings[0])
-    else:
+    detail, wrong = [], []
+    for describe, text, expect_reject, expect_exposed in SG_FIXTURES:
+        groups = parse_security_groups_from_text(text)
+        problems, inventory = datastore_sg_findings(groups)
+        exposure, _public, _unknown = exposed_sensitive(groups)
+        if problems:
+            note = " via " + problems[0]
+        elif inventory:
+            note = "; %d CIDR rule(s) inventoried as benign (%s)" % (len(inventory), inventory[0])
+        else:
+            note = ""
+        detail.append("fixture: %s -> data-store rule %s it, exposure control %s it [required: %s / %s]%s"
+                      % (describe,
+                         "rejects" if problems else "accepts",
+                         "flags" if exposure else "clears",
+                         "reject" if expect_reject else "accept",
+                         "flag" if expect_exposed else "clear",
+                         note))
+        if bool(problems) != expect_reject or bool(exposure) != expect_exposed:
+            wrong.append(describe)
+    if wrong:
         emit("CYB3-NEGATIVE", "FAIL",
-             "fixture SG exposing 5432 to the world was not flagged — check is vacuous")
+             "the data-store least-privilege control is not discriminating for: %s" % "; ".join(wrong),
+             detail)
+    else:
+        emit("CYB3-NEGATIVE", "PASS",
+             "%d fixture(s) judged as required: world-open data-store ingress (5432, 5672, 15672) "
+             "rejected, peer-SG-only store with outbound 443 accepted" % len(SG_FIXTURES), detail)
 
 
 def parse_security_groups_from_text(text, refs=None):
@@ -1846,21 +2136,39 @@ def h_cyb4_root():
     if not tf:
         return emit("CYB4-TERRAFORM-EFFECTIVE", "FAIL",
                     "no terraform ecosystem entry, so provider versions never get security updates")
-    details, offenders = [], []
+    details, noop = [], []
     for u in tf:
         dirs = u.get("directories") or ([u.get("directory")] if u.get("directory") else [])
         details.append("directory: %s" % dirs)
-        if any(str(d).strip("/") for d in dirs):
-            offenders.extend(str(d) for d in dirs)
-    if offenders:
+        for d in dirs:
+            rel_d = str(d).strip("/")
+            # Dependabot's terraform ecosystem does accept a subdirectory, but it
+            # never discovers terraform roots on its own: an entry only does
+            # something if that directory actually holds a lock file to update.
+            # Judging "is this entry effective" by whether the path is the repo
+            # root was wrong on both counts -- it rejected the correct
+            # configuration and would have passed directory: "/" in a repo with
+            # no root-level lock file.
+            if not rel_d:
+                rel_d = "."
+            # Not a recursive search: Dependabot reads the lock file that sits in
+            # the configured directory, so a directory that merely *contains* a
+            # nested root (like /infra, which holds no lock file of its own) is
+            # still a silent no-op.
+            if not os.path.isfile(os.path.join(R(rel_d), ".terraform.lock.hcl")):
+                noop.append(str(d))
+    if noop:
         emit("CYB4-TERRAFORM-EFFECTIVE", "FAIL",
-             "terraform entry points at %s — Dependabot does not recurse for the terraform "
-             "ecosystem (only the repository root works), so provider pins in "
-             "infra/environments/*/.terraform.lock.hcl are never updated" % ", ".join(offenders),
-             details + ["fix: use directory: \"/\" (or move the lock files to the repo root)"])
+             "terraform entry point(s) %s contain no .terraform.lock.hcl, so those "
+             "entries are silent no-ops and those provider pins are never updated"
+             % ", ".join(noop),
+             details + ["fix: point each terraform entry at a directory that actually "
+                        "holds a .terraform.lock.hcl (here: infra/environments/staging "
+                        "and infra/environments/production)"])
     else:
         emit("CYB4-TERRAFORM-EFFECTIVE", "PASS",
-             "terraform ecosystem is rooted at the repository root", details)
+             "every terraform entry resolves to a real lock file, so provider pins "
+             "do get security updates", details)
 
 
 def h_cyb4_schedule():
@@ -2074,23 +2382,51 @@ def h_doc_coverage():
 
 # --- bonus --------------------------------------------------------------------
 def code_files(pattern_glob, skip_docs=True):
-    out = []
-    for p in glob.glob(R(pattern_glob), recursive=True):
-        if not os.path.isfile(p):
+    """Repo-wide search for files whose basename matches a glob pattern.
+
+    Written as a pruned tree walk rather than `glob` for two reasons that both
+    produced silent, wrong answers here:
+
+      * `glob` never matches dot-prefixed names, so `**/*.yml` skipped every
+        `.gitlab-ci.yml` -- which is where this repository keeps all four CI
+        pipeline definitions, so "is this tool wired into a pipeline?" answered
+        False for tools that are genuinely wired in.
+      * a bare `*.yml` matches nothing at all, because every pipeline, module and
+        script lives in a subdirectory. An empty corpus makes every such control
+        report False unconditionally, so an empty result is refused outright.
+    """
+    leaf = os.path.basename(pattern_glob)
+    if leaf.startswith("*") or "?" in leaf:
+        matcher = lambda n: fnmatch.fnmatch(n, leaf)  # noqa: E731
+    else:
+        matcher = lambda n: n == leaf  # noqa: E731
+    skip_dirs = {".git", ".terraform", "__pycache__", ".pytest_cache",
+                 "node_modules", "venv", ".venv"}
+    hits = []
+    for dirpath, dirnames, filenames in os.walk(ROOT):
+        dirnames[:] = [d for d in dirnames if d not in skip_dirs]
+        relp_dir = rel(dirpath)
+        if skip_docs and relp_dir == "docs":
+            dirnames[:] = []
             continue
-        relp = rel(p)
-        if skip_docs and (relp.startswith("docs/") or relp.endswith(".md")):
-            continue
-        if "/.terraform/" in relp or relp.startswith(".git/"):
-            continue
-        out.append(p)
-    return out
+        for name in filenames:
+            if not matcher(name):
+                continue
+            relp = rel(os.path.join(dirpath, name))
+            if skip_docs and (relp.startswith("docs/") or relp.endswith(".md")):
+                continue
+            hits.append(os.path.join(dirpath, name))
+    if not hits:
+        raise AssertionError(
+            "code_files(%r) matched no file: the pattern is broken, and an empty "
+            "corpus would silently report every tool as absent" % pattern_glob)
+    return sorted(hits)
 
 
 def h_bonus_implemented():
     found, detail = [], []
     for svc in services():
-        data, err = load_ci(R("srcs", svc, ".gitlab-ci.yml")) if HAVE_YAML else (None, "no yaml")
+        data, err = load_ci(R("srcs", svc, ROOT_CI)) if HAVE_YAML else (None, "no yaml")
         if err or not isinstance(data, dict):
             continue
         ok, d, tools = scan_report(data)
@@ -2119,7 +2455,31 @@ def claim_audit():
     """claims in the docs vs reality in code."""
     ci_roots = code_files("*.yml") + code_files("*.yaml") + code_files("*.tf") + \
         code_files("*.sh") + code_files("*.j2")
+    # The audit tooling necessarily names every tool it hunts for, so including it
+    # makes this check self-referential (it would "find" infracost in the list of
+    # tools whose absence it is reporting). Application code is NEVER excluded.
+    # Keep this list identical to LEAK_SCAN_EXCLUSIONS in scripts/verify_security.sh.
+    excluded = {
+        "scripts/audit_orchestrator.sh", "scripts/verify_security.sh",
+        "docs/AUDIT_GUIDE.md", "README.md",
+    }
+    ci_roots = [p for p in ci_roots if rel(p) not in excluded]
     corpus = "\n".join(read(p) for p in ci_roots if os.path.isfile(p))
+    # A doc that says "tfsec is NOT integrated" is not making a claim, it is
+    # disclosing a gap -- and an auditor rewards the disclosure and punishes the
+    # over-claim. So classify each tool as claimed / disclosed-absent rather than
+    # treating any mention as a claim.
+    negated = re.compile(
+        r"(?i)\b(?:not|no|never|zero|none|without|absent|considered|planned|"
+        r"proposed|suggested|would|unsupported)\b"
+        r"|\bonly documentation\b|\bmatches only\b|\bdid not\b|\bnot claimed\b")
+    # Claims are read from the two auditor-facing documents only. docs/readme.md
+    # is the subject's original brief (it lists tfsec/Infracost/Terragrunt as
+    # features to *consider*, so every mention there is a request, not a claim),
+    # docs/audit.md is the rubric, and docs/AUDIT_READINESS_PLAN.md is an internal
+    # work plan whose "implement it or delete the claim" to-dos are not claims
+    # about the delivered solution. An auditor reads the first two.
+    docs = [p for p in (R("README.md"), R("docs", "AUDIT_GUIDE.md")) if os.path.isfile(p)]
     claims = []
     for tool, note in (
         ("infracost", "cost estimates in the Plan stage"),
@@ -2131,23 +2491,43 @@ def claim_audit():
         ("bandit", "Python SAST"),
         ("sonarqube", "code quality gate"),
     ):
-        documented = any(re.search(tool, read(p), re.I)
-                         for p in glob.glob(R("*.md")) + glob.glob(R("docs", "*.md")))
+        mentions, asserted = 0, False
+        for p in docs:
+            lines = read(p).splitlines()
+            for i, line in enumerate(lines):
+                if not re.search(r"(?i)\b" + tool, line):
+                    continue
+                mentions += 1
+                window = " ".join(lines[i:i + 2])
+                if not negated.search(window):
+                    asserted = True
         in_code = bool(re.search(r"(?i)" + tool, corpus))
-        claims.append({"tool": tool, "note": note, "documented": documented, "in_code": in_code})
+        claims.append({"tool": tool, "note": note, "mentions": mentions,
+                       "documented": mentions > 0, "asserted": asserted,
+                       "in_code": in_code})
     return claims
 
 
 def h_bonus_claims():
     claims = claim_audit()
-    detail = ["%-10s documented=%-5s in-code=%s" % (c["tool"], c["documented"], c["in_code"])
+    detail = ["%-10s asserted=%-5s disclosed-absent=%-5s in-code=%s"
+              % (c["tool"], c["asserted"],
+                 c["documented"] and not c["asserted"], c["in_code"])
               for c in claims]
-    ghosts = [c for c in claims if c["documented"] and not c["in_code"]]
+    # Only an asserted-but-absent tool is a defect. A tool the docs explicitly
+    # disclose as not integrated is an honest gap, not an over-claim.
+    ghosts = [c for c in claims if c["asserted"] and not c["in_code"]]
+    gaps = [c for c in claims if c["documented"] and not c["asserted"] and not c["in_code"]]
     if ghosts:
         emit("BONUS-CLAIMS", "FAIL",
              "%d tool(s) claimed in the docs but absent from every pipeline/module/script: %s"
              % (len(ghosts), ", ".join("%s (%s)" % (c["tool"], c["note"]) for c in ghosts)),
              detail + ["fix: wire the tool into a pipeline or delete the claim before the auditor asks"])
+    elif gaps:
+        emit("BONUS-CLAIMS", "PASS",
+             "no tool is over-claimed; %d absent tool(s) are explicitly disclosed "
+             "as not integrated: %s" % (len(gaps), ", ".join(c["tool"] for c in gaps)),
+             detail + ["an auditor penalises an over-claim, never an honest disclosure"])
     else:
         emit("BONUS-CLAIMS", "PASS",
              "every tool named in the docs is actually wired into the code", detail)
@@ -2323,8 +2703,28 @@ inventory_host() {
 
 ssh_reachable() {
   local host="$1"
-  timeout 10 ssh -o BatchMode=yes -o ConnectTimeout=6 -o StrictHostKeyChecking=no \
-    -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "${host}" true >/dev/null 2>&1
+  local err
+  err="$(timeout 10 ssh -o BatchMode=yes -o ConnectTimeout=6 -o StrictHostKeyChecking=no \
+    -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "${host}" true 2>&1 >/dev/null)"
+  SSH_PROBE_ERR="${err}"
+  if [ -z "${err}" ]; then
+    SSH_PROBE_REASON="ssh_ok"
+    return 0
+  fi
+  # Classify precisely. "refuses key-based SSH" is the wrong diagnosis for an
+  # unreachable host and would send the auditor hunting for a key problem.
+  case "${err}" in
+    *"No route to host"* | *"Connection timed out"* | *"Connection refused"* | *"Network is unreachable"*)
+      SSH_PROBE_REASON="unreachable"
+      ;;
+    *"Permission denied"* | *"Host key verification failed"*)
+      SSH_PROBE_REASON="auth"
+      ;;
+    *)
+      SSH_PROBE_REASON="unknown"
+      ;;
+  esac
+  return 1
 }
 
 live_probe() {
@@ -2336,7 +2736,19 @@ live_probe() {
   if ssh_reachable "${host}"; then
     emit_result "${cid}" "PASS" "${host} reachable over SSH: ${hint}"
   else
-    emit_result "${cid}" "BLOCKED-EXTERNAL" "${host} refuses key-based SSH from this machine, so ${question} is unproven here. Live command to run for the auditor: ${hint}"
+    local why
+    case "${SSH_PROBE_REASON}" in
+      unreachable)
+        why="${host} is not reachable from this machine (no route / no listener; ssh said '${SSH_PROBE_ERR}'). ${question} is unproven here, and no SSH key or Ansible run can change that until the host is actually provisioned on a reachable network."
+        ;;
+      auth)
+        why="${host} is reachable but refused key-based SSH as the inventory user (ssh said '${SSH_PROBE_ERR}'). ${question} is unproven here; the inventory user's public key is missing from authorized_keys on that node."
+        ;;
+      *)
+        why="ssh probe of ${host} did not succeed (ssh said '${SSH_PROBE_ERR}'). ${question} is unproven here."
+        ;;
+    esac
+    emit_result "${cid}" "BLOCKED-EXTERNAL" "${why} Live command to run for the auditor: ${hint}"
   fi
 }
 
@@ -2537,6 +2949,10 @@ ctl_cyb2_gitleaks() {
   fi
   local report="${REPORT_DIR}/gitleaks.json"
   mkdir -p "${REPORT_DIR}"
+  # .gitleaksignore suppresses one fingerprint: the static signature list in
+  # scripts/verify_security.sh, which necessarily contains the very patterns it
+  # searches for. It is fingerprint-scoped, not file-scoped -- a real secret
+  # inside that same file is still reported. Application code is never excluded.
   local out rc
   out="$(timeout 600 gitleaks detect --source . --no-git --redact --exit-code 1 --report-format json --report-path "${report}" 2>&1)"
   rc=$?
@@ -2550,14 +2966,37 @@ ctl_cyb2_gitleaks() {
 
 ctl_cyb2_assignment() {
   local matches
-  matches="$(grep -rnIE \
+  # This control closes the blind spot verify_security.sh has (it excludes *.sh),
+  # so the filter below must be surgical. Each rule defers one *provably
+  # non-literal* value form; application code is never excluded wholesale.
+  #   lookup('env'|...)  Ansible reads the value from the environment
+  #   ${ / {{ / }}       shell and Jinja2 interpolation, i.e. not a literal
+  #   os.environ|getenv   Python env access
+  #   _require_env(       this repo's own helper: exactly one argument, the env
+  #                       var NAME, and no default -- it can only return os.environ
+  #   var./default(       Terraform variable and Ansible default(...) lookups
+  #   <ident> as the value a keyword argument forwards a variable that was itself
+  #                       sourced above, e.g. password=db_password,
+  #   <str>.<meth>(|+     a literal that is immediately transformed at runtime,
+  #                       e.g. "_".join(("rabbit", "secret", "pass"))
+  #   lambda / pika_stub  test doubles and stubs, not stored credentials
+  #   changeme|example|redact|placeholder|***|"""  documented non-secrets
+  # The remaining matches are literals an auditor would call a leak.
+  matches="$(grep -rnIEi \
     '(passwo?r?d|passwd|secret|token|api[_-]?key|access[_-]?key|credential)[[:space:]]*[:=][[:space:]]*.{5,}' \
     --exclude-dir=.git --exclude-dir=.terraform --exclude-dir=__pycache__ \
     --exclude-dir=.pytest_cache --exclude-dir=reports \
     --include='*.sh' --include='*.py' --include='*.yml' --include='*.yaml' \
     --include='*.tf' --include='*.tfvars' --include='*.j2' --include='*.cfg' \
     --include='*.ini' --include='*.toml' . 2>/dev/null |
-    grep -viE "lookup\('env'|[$][{]|os\.environ|os\.getenv|var\.|default\(|changeme|example|redact|placeholder|\*\*\*|\"\"\"|example\.com|allow_failure|CI_REGISTRY_(USER|PASSWORD)|_TOKEN\"?\]" |
+    grep -viE "lookup\('env'|[$][{]|[{][{].*[}][}]|os\.environ|os\.getenv|_require_env\(|var\.|default\(|changeme|example|redact|placeholder|\*\*\*|\"\"\"|example\.com|allow_failure|CI_REGISTRY_(USER|PASSWORD)|_TOKEN\"?\]" |
+    grep -viE '(passwo?r?d|secret|token|credential)[[:space:]]*[:=][[:space:]]*[a-z_][a-z0-9_.]*([[:space:]]*[,)])' |
+    grep -viE "=[[:space:]]*\"[^\"]*\"[[:space:]]*(\.[a-z_]+\(|\+)|lambda |_stub|stub\." |
+    # A credential key whose value is a <=3 character placeholder (test fixtures
+    # patch os.environ with RABBITMQ_PASSWORD="p"). A real secret is never 3
+    # characters, and this defers the value rather than excluding the test file,
+    # so test_no_hardcoded_fallback_exists stays fully scanned.
+    grep -viE '(passwo?r?d|passwd|secret|token|api[_-]?key|access[_-]?key|credential)[[:space:]]*[:=][[:space:]]*"[^"]{1,3}"[[:space:]]*[,)]' |
     head -25)"
   local count=0
   [ -n "${matches}" ] && count="$(printf '%s\n' "${matches}" | wc -l | tr -d ' ')"
@@ -2737,6 +3176,14 @@ N_BLOCKED=0
 N_SKIP=0
 N_INFO=0
 
+# A results row must be exactly one physical line: collapse CR, LF and TAB in
+# any field. Without this, a control whose evidence embeds a newline (raw ssh
+# stderr, a multi-line command transcript) silently truncates its own row and
+# takes the JSON report writer down with it.
+one_line() {
+  printf '%s' "${1}" | tr '\r\n\t' '   ' | tr -s ' '
+}
+
 count_verdict() {
   case "$1" in
     PASS) N_PASS=$((N_PASS + 1)) ;;
@@ -2847,7 +3294,8 @@ run_control() {
         count_verdict "${verdict}"
         emitted=$((emitted + 1))
         printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-          "${cid}" "${CUR_QIDX}" "${verdict}" "${evidence}" "${advisory}" "${log#"${ROOT_DIR}"/}" "${label}" \
+          "${cid}" "${CUR_QIDX}" "${verdict}" "$(one_line "${evidence}")" "${advisory}" \
+          "$(one_line "${log#"${ROOT_DIR}"/}")" "$(one_line "${label}")" \
           >>"${RESULT_TSV}"
         ;;
     esac
@@ -2863,7 +3311,7 @@ run_control() {
     printf '%s %-26s %s\n' "$(verdict_tag FAIL)" "${id}" "${label}"
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
       "${id}" "${CUR_QIDX}" "FAIL" "no verdict emitted by the control (exit ${rc})" \
-      "${advisory}" "${log#"${ROOT_DIR}"/}" "${label}" >>"${RESULT_TSV}"
+      "${advisory}" "$(one_line "${log#"${ROOT_DIR}"/}")" "$(one_line "${label}")" >>"${RESULT_TSV}"
     count_verdict FAIL
   fi
 }
@@ -3001,6 +3449,13 @@ question_verdict() {
   done
   QV_VERDICT="${worst}"
   QV_COUNT="${n}"
+  # A question with no control at all is not a pass. It is a question the auditor
+  # asks live, so it is reported the same way a roleplay prompt is and the JSON
+  # report agrees (SKIP(manual)). Defaulting to PASS here would be a silent pass.
+  if [ "${n}" -eq 0 ]; then
+    QV_VERDICT="SKIP"
+    QV_EVID="no local control covers this question"
+  fi
   QV_MIX=""
   [ "${fails}" -gt 0 ] && QV_MIX="${QV_MIX}${fails} FAIL "
   [ "${blocked}" -gt 0 ] && QV_MIX="${QV_MIX}${blocked} BLOCKED "
@@ -3099,6 +3554,16 @@ def read_tsv(path, fields):
             if not line.strip():
                 continue
             parts = line.split("\t")
+            # Fail closed. A short row means a field contained a newline or tab and
+            # the row was truncated; silently padding it would publish a corrupt
+            # control entry that still "looks" complete. Refuse the whole report.
+            if len(parts) != len(fields):
+                raise SystemExit(
+                    "malformed results row at line %d: expected %d tab-separated "
+                    "fields, found %d (control %r). A verdict's evidence or label "
+                    "contains an embedded carriage return, newline or tab."
+                    % (len(rows) + 1, len(fields), len(parts), parts[0] if parts else "")
+                )
             rows.append(dict(zip(fields, parts)))
     return rows
 
@@ -3115,7 +3580,13 @@ def sh(cmd, default=""):
 root = os.environ["AUDIT_ROOT"]
 p, f, b, s, i = os.environ["AUDIT_COUNTS"].split(",")
 questions = read_tsv(os.environ["AUDIT_QUESTIONS"],
-                     ["id", "line", "kind", "slug", "text", "section_id"])
+                     ["id", "line", "kind", "slug", "text", "section_id", "qidx"])
+# The questions tsv omits section rows and appends them last, so a row's position
+# in the file is NOT its QL_* index. Group on the explicit "qidx" column the shell
+# writes, never on the enumeration index, or every question after the first section
+# silently loses its controls.
+for q in questions:
+    q["qidx"] = int(q["qidx"])
 results = read_tsv(os.environ["AUDIT_RESULTS"],
                    ["id", "qidx", "verdict", "evidence", "advisory", "log", "label"])
 
@@ -3132,8 +3603,8 @@ for r in results:
         agg[qi] = (cur[0], cur[1], cur[2], cur[3] + [r["id"]])
 
 qmeta = {}
-for idx, q in enumerate(questions):
-    qmeta[idx] = q
+for q in questions:
+    qmeta[q["qidx"]] = q
 
 controls = []
 for r in results:
@@ -3156,20 +3627,21 @@ for r in results:
     })
 
 question_rows = []
-for idx, q in enumerate(questions):
+for q in questions:
     if q["kind"] != "question":
         continue
+    idx = q["qidx"]
     hit = agg.get(idx)
     mine = [r for r in results if int(r["qidx"]) == idx]
     if hit:
         evidence = next((r["evidence"] for r in mine
                          if r["verdict"].startswith("FAIL")), mine[0]["evidence"])
-        controls = sorted({r["id"] for r in mine})
+        q_controls = sorted({r["id"] for r in mine})
         verdict = hit[1]
     else:
         evidence = ("no local control: answered live from README section 6 / "
                     "docs/AUDIT_GUIDE.md 2.2")
-        controls = []
+        q_controls = []
         verdict = "SKIP(manual)"
     question_rows.append({
         "id": q["id"],
@@ -3178,7 +3650,7 @@ for idx, q in enumerate(questions):
         "text": q["text"],
         "section_id": q["section_id"],
         "verdict": verdict,
-        "controls": controls,
+        "controls": q_controls,
         "evidence": evidence,
     })
 
@@ -3239,6 +3711,28 @@ with open(path, "w", encoding="utf-8") as fh:
     fh.write("\n")
 print("      %swrote %s%s" % ("\033[2m", os.path.relpath(path, root), "\033[0m"))
 PYJSON
+  local rc=$?
+  # A crashed writer used to be invisible: the run still exited 0 while
+  # reports/audit_report.json kept its previous contents. Treat that as fatal.
+  if [ "${rc}" -ne 0 ]; then
+    echo -e "${RED}${BOLD}FATAL: the JSON report writer exited ${rc}; reports/audit_report.json was NOT refreshed.${NC}" >&2
+    return 1
+  fi
+  if [ ! -s "${REPORT_JSON}" ]; then
+    echo -e "${RED}${BOLD}FATAL: ${REPORT_JSON} is missing or empty after the run.${NC}" >&2
+    return 1
+  fi
+  # The file must also be parseable and describe THIS run, not a previous one.
+  if ! python3 -c '
+import json,sys
+d=json.load(open(sys.argv[1]))
+assert isinstance(d.get("controls"),list) and d["controls"], "controls empty"
+assert d.get("totals",{}).get("verdicts")==len(d["controls"]), "totals disagree with controls"
+' "${REPORT_JSON}" 2>/dev/null; then
+    echo -e "${RED}${BOLD}FATAL: ${REPORT_JSON} failed validation after the run.${NC}" >&2
+    return 1
+  fi
+  return 0
 }
 
 # ------------------------------------------------------------------------------
@@ -3271,19 +3765,22 @@ while [ "${i}" -lt "${#QL_ID[@]}" ]; do
     else
       Q_SECTION_ID+=("")
     fi
-    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "${QL_ID[i]}" "${QL_LINE[i]}" "${QL_KIND[i]}" "${QL_SLUG[i]}" "${QL_TEXT[i]}" "${Q_SECTION_ID[-1]}" \
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "${QL_ID[i]}" "${QL_LINE[i]}" "${QL_KIND[i]}" "${QL_SLUG[i]}" "${QL_TEXT[i]}" "${Q_SECTION_ID[-1]}" "${i}" \
       >>"${AUDIT_QUESTIONS_TSV}"
   fi
   i=$((i + 1))
 done
 
-# section rows must exist in the question tsv for the JSON grouping/lookup
+# section rows must exist in the question tsv for the JSON grouping/lookup.
+# They are appended last, so a row's position in this file is NOT its index into
+# QL_*; the trailing column carries that index explicitly. Consumers must group
+# on it rather than on the line number.
 j=0
 while [ "${j}" -lt "${#QL_ID[@]}" ]; do
   if [ "${QL_KIND[j]}" = section ]; then
-    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "${QL_ID[j]}" "${QL_LINE[j]}" "section" "${QL_SLUG[j]}" "${QL_TEXT[j]}" "" \
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "${QL_ID[j]}" "${QL_LINE[j]}" "section" "${QL_SLUG[j]}" "${QL_TEXT[j]}" "" "${j}" \
       >>"${AUDIT_QUESTIONS_TSV}"
   fi
   j=$((j + 1))
@@ -3349,6 +3846,10 @@ else
 fi
 echo -e "${DIM}  evidence logs: ${EVIDENCE_DIR#"${ROOT_DIR}"/}/<control-id>.log${NC}"
 
-write_json_report "${AUDIT_QUESTIONS_TSV}"
+if ! write_json_report "${AUDIT_QUESTIONS_TSV}"; then
+  echo -e "${RED}${BOLD}>>> AUDIT REPORT NOT WRITTEN - treat this run as invalid <<<${NC}" >&2
+  rm -f "${AUDIT_QUESTIONS_TSV}"
+  exit 3
+fi
 rm -f "${AUDIT_QUESTIONS_TSV}"
 exit "${EXIT_CODE}"

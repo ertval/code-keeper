@@ -1,11 +1,11 @@
 {
   "schema": "code-keeper/audit-orchestrator/1",
-  "generated_at": "2026-10-03T23:12:49+0300",
+  "generated_at": "2026-10-05T23:35:32+0300",
   "generator": "scripts/audit_orchestrator.sh",
   "shell_options": "set -uo pipefail; `set -e` is deliberately omitted so a failing control is recorded as a verdict instead of aborting the audit walk",
   "repo": {
     "root": "/home/ertval/code/zone-modules/code-keeper",
-    "commit": "74f62014a6d04e7204909342df4271d4d08e9cbd",
+    "commit": "3128a2146889712dc03bf06a4378e5dbc859cf21",
     "branch": "main",
     "dirty": true
   },
@@ -39,11 +39,11 @@
     "terragrunt": "terragrunt version v0.72.0"
   },
   "totals": {
-    "PASS": 68,
-    "FAIL": 14,
+    "PASS": 83,
+    "FAIL": 0,
     "BLOCKED-EXTERNAL": 3,
     "SKIP": 0,
-    "INFO": 16,
+    "INFO": 15,
     "verdicts": 101
   },
   "verdict_semantics": {
@@ -53,49 +53,1535 @@
     "SKIP": "precondition unmet (missing tool or file); never a silent pass",
     "INFO": "reported finding that does not gate the run"
   },
-  "exit_code": 1,
+  "exit_code": 0,
   "blocked_external_controls": [
     "RUNNER-LIVE-LIST",
     "GITLAB-LIVE-STATUS",
     "FUNC-LIVE-PIPELINE"
   ],
-  "failed_controls": [
-    "CI-SCAN/api-gateway",
-    "CI-SCAN/billing-app",
-    "CI-SCAN/inventory-app",
-    "CI-CONTAINER/api-gateway",
-    "CI-CONTAINER/billing-app",
-    "CI-CONTAINER/inventory-app",
-    "CD-ZERO-DOWNTIME/api-gateway",
-    "CD-ZERO-DOWNTIME/billing-app",
-    "CD-ZERO-DOWNTIME/inventory-app",
-    "CYB2-GITLEAKS",
-    "CYB2-ASSIGNMENT",
-    "CYB3-SG-DATASTORE",
-    "CYB4-TERRAFORM-EFFECTIVE",
-    "BONUS-CLAIMS"
-  ],
+  "failed_controls": [],
   "unmapped_questions": [
-    "Q011",
     "Q051",
     "Q053",
     "Q055",
-    "Q059",
-    "Q061",
-    "Q065",
-    "Q071",
-    "Q106",
-    "Q110",
-    "Q116",
-    "Q122"
+    "Q124"
   ],
   "controls": [
-    "CI-WORKFLOW/api-gateway",
-    "CI-WORKFLOW/billing-app",
-    "CI-WORKFLOW/inventory-app",
-    "CYB1-JOBS",
-    "CYB1-NEGATIVE",
-    "CYB1-WORKFLOW"
+    {
+      "id": "FILES-REQUIRED",
+      "label": "Every artefact audit.md names exists on disk",
+      "verdict": "PASS",
+      "evidence": "all 39 audit-named artefacts present (3 microservices, 2 terraform environments)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/FILES-REQUIRED.log",
+      "audit_question": {
+        "id": "Q011",
+        "line": 11,
+        "slug": "are-all-the-required-files-present",
+        "text": "Are all the required files present?",
+        "section_id": "S003"
+      }
+    },
+    {
+      "id": "FILES-SUBSTANTIVE",
+      "label": "Required artefacts are non-empty and substantive",
+      "verdict": "PASS",
+      "evidence": "no placeholder/empty artefact among the 39 required paths",
+      "advisory": false,
+      "evidence_log": "reports/evidence/FILES-SUBSTANTIVE.log",
+      "audit_question": {
+        "id": "Q011",
+        "line": 11,
+        "slug": "are-all-the-required-files-present",
+        "text": "Are all the required files present?",
+        "section_id": "S003"
+      }
+    },
+    {
+      "id": "FILES-PIPELINES",
+      "label": "All CI/CD pipeline definitions parse as YAML",
+      "verdict": "PASS",
+      "evidence": "4 pipeline definitions parse and declare jobs",
+      "advisory": false,
+      "evidence_log": "reports/evidence/FILES-PIPELINES.log",
+      "audit_question": {
+        "id": "Q011",
+        "line": 11,
+        "slug": "are-all-the-required-files-present",
+        "text": "Are all the required files present?",
+        "section_id": "S003"
+      }
+    },
+    {
+      "id": "FILES-ANSIBLE",
+      "label": "Ansible playbooks, roles, inventory and helper scripts present",
+      "verdict": "PASS",
+      "evidence": "2 playbooks, 2 roles (gitlab,gitlab_runner), 2 deployment scripts, inventory present",
+      "advisory": false,
+      "evidence_log": "reports/evidence/FILES-ANSIBLE.log",
+      "audit_question": {
+        "id": "Q011",
+        "line": 11,
+        "slug": "are-all-the-required-files-present",
+        "text": "Are all the required files present?",
+        "section_id": "S003"
+      }
+    },
+    {
+      "id": "ANSIBLE-SYNTAX",
+      "label": "ansible-playbook --syntax-check on both playbooks",
+      "verdict": "PASS",
+      "evidence": "2/2 playbooks pass ansible-playbook --syntax-check",
+      "advisory": false,
+      "evidence_log": "reports/evidence/ANSIBLE-SYNTAX.log",
+      "audit_question": {
+        "id": "Q059",
+        "line": 59,
+        "slug": "was-the-gitlab-instance-deployed-and-configure",
+        "text": "Was the GitLab instance deployed and configured successfully using Ansible?",
+        "section_id": "S057"
+      }
+    },
+    {
+      "id": "ANSIBLE-LISTTASKS",
+      "label": "--list-tasks resolves roles; real output archived for the auditor",
+      "verdict": "PASS",
+      "evidence": "roles + tasks resolved for 2 playbooks; real output archived at reports/ansible_list_tasks.txt (48 lines, diff it against the guide)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/ANSIBLE-LISTTASKS.log",
+      "audit_question": {
+        "id": "Q059",
+        "line": 59,
+        "slug": "was-the-gitlab-instance-deployed-and-configure",
+        "text": "Was the GitLab instance deployed and configured successfully using Ansible?",
+        "section_id": "S057"
+      }
+    },
+    {
+      "id": "ANSIBLE-ROLES",
+      "label": "Every referenced role resolves to ansible/roles/<role>",
+      "verdict": "PASS",
+      "evidence": "4 role reference(s) resolve under ansible/roles/ (gitlab, gitlab_runner)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/ANSIBLE-ROLES.log",
+      "audit_question": {
+        "id": "Q059",
+        "line": 59,
+        "slug": "was-the-gitlab-instance-deployed-and-configure",
+        "text": "Was the GitLab instance deployed and configured successfully using Ansible?",
+        "section_id": "S057"
+      }
+    },
+    {
+      "id": "ANSIBLE-TASKS",
+      "label": "Expected deployment tasks appear in --list-tasks output",
+      "verdict": "PASS",
+      "evidence": "all 6 expected deployment tasks present in the archived --list-tasks output",
+      "advisory": false,
+      "evidence_log": "reports/evidence/ANSIBLE-TASKS.log",
+      "audit_question": {
+        "id": "Q059",
+        "line": 59,
+        "slug": "was-the-gitlab-instance-deployed-and-configure",
+        "text": "Was the GitLab instance deployed and configured successfully using Ansible?",
+        "section_id": "S057"
+      }
+    },
+    {
+      "id": "ANSIBLE-NOSECRET",
+      "label": "No default token/password committed in playbooks or role defaults",
+      "verdict": "PASS",
+      "evidence": "no committed token/password literals; 4 file(s) source secrets from environment lookups",
+      "advisory": false,
+      "evidence_log": "reports/evidence/ANSIBLE-NOSECRET.log",
+      "audit_question": {
+        "id": "Q106",
+        "line": 106,
+        "slug": "have-the-students-separated-credentials-from-c",
+        "text": "Have the students separated credentials from code, using secure methods like secret management tools or environment variables?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "RUNNER-FILES",
+      "label": "Runner role + docker executor config template present",
+      "verdict": "PASS",
+      "evidence": "docker executor rendered from config.toml.j2; registration passes --tag-list; privileged=templated false",
+      "advisory": false,
+      "evidence_log": "reports/evidence/RUNNER-FILES.log",
+      "audit_question": {
+        "id": "Q061",
+        "line": 61,
+        "slug": "are-the-gitlab-runners-integrated-with-the-exi",
+        "text": "Are the GitLab Runners integrated with the existing pipeline and executing tasks as expected for all repositories?",
+        "section_id": "S057"
+      }
+    },
+    {
+      "id": "RUNNER-TAGS",
+      "label": "Pipeline job tags are compatible with runner-registered tags",
+      "verdict": "INFO",
+      "evidence": "no pipeline pins job tags; coverage depends on runner run_untagged=true (runner tags: docker,shared,ci-cd,linux)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/RUNNER-TAGS.log",
+      "audit_question": {
+        "id": "Q061",
+        "line": 61,
+        "slug": "are-the-gitlab-runners-integrated-with-the-exi",
+        "text": "Are the GitLab Runners integrated with the existing pipeline and executing tasks as expected for all repositories?",
+        "section_id": "S057"
+      }
+    },
+    {
+      "id": "RUNNER-LIVE-LIST",
+      "label": "LIVE 'gitlab-runner list' on the runner host",
+      "verdict": "BLOCKED-EXTERNAL",
+      "evidence": "192.168.56.11 is not reachable from this machine (no route / no listener; ssh said 'ssh: connect to host 192.168.56.11 port 22: No route to host '). runner registration/execution cannot be observed locally is unproven here, and no SSH key or Ansible run can change that until the host is actually provisioned on a reachable network. Live command to run for the auditor: ssh 192.168.56.11 'sudo gitlab-runner list && systemctl is-active gitlab-runner'",
+      "advisory": false,
+      "evidence_log": "reports/evidence/RUNNER-LIVE-LIST.log",
+      "audit_question": {
+        "id": "Q061",
+        "line": 61,
+        "slug": "are-the-gitlab-runners-integrated-with-the-exi",
+        "text": "Are the GitLab Runners integrated with the existing pipeline and executing tasks as expected for all repositories?",
+        "section_id": "S057"
+      }
+    },
+    {
+      "id": "GITLAB-LIVE-STATUS",
+      "label": "LIVE 'gitlab-ctl status' / systemctl on the GitLab host",
+      "verdict": "BLOCKED-EXTERNAL",
+      "evidence": "192.168.56.10 is not reachable from this machine (no route / no listener; ssh said 'ssh: connect to host 192.168.56.10 port 22: No route to host '). GitLab service state cannot be observed locally is unproven here, and no SSH key or Ansible run can change that until the host is actually provisioned on a reachable network. Live command to run for the auditor: ssh 192.168.56.10 'sudo gitlab-ctl status && systemctl is-active gitlab-runsvdir'",
+      "advisory": false,
+      "evidence_log": "reports/evidence/GITLAB-LIVE-STATUS.log",
+      "audit_question": {
+        "id": "Q059",
+        "line": 59,
+        "slug": "was-the-gitlab-instance-deployed-and-configure",
+        "text": "Was the GitLab instance deployed and configured successfully using Ansible?",
+        "section_id": "S057"
+      }
+    },
+    {
+      "id": "INFRA-STAGES",
+      "label": "Infrastructure pipeline declares exactly the six required stages",
+      "verdict": "PASS",
+      "evidence": "the six required stages are declared in order (effective list: Init -> Validate -> Plan -> Apply to Staging -> Build -> Test -> Scan -> Containerization -> Deploy to Staging -> Approval -> Deploy to Production -> Apply to Production)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/INFRA-STAGES.log",
+      "audit_question": {
+        "id": "Q071",
+        "line": 71,
+        "slug": "are-the-init-validate-plan-apply-to-staging-ap",
+        "text": "Are the \"Init\", \"Validate\", \"Plan\", \"Apply to Staging\", \"Approval\", and \"Apply to production environment\" stages implemented correctly in the infrastructure pipeline?",
+        "section_id": "S063"
+      }
+    },
+    {
+      "id": "INFRA-STAGE-JOBS",
+      "label": "Each of the six infrastructure stages owns at least one job",
+      "verdict": "PASS",
+      "evidence": "Init=infra:init:staging,infra:init:production; Validate=infra:validate:syntax,infra:validate:security,infra:validate:dependencies; Plan=infra:plan:staging,infra:plan:production; Apply to Staging=infra:apply:staging; Approval=infra:approval:production; Apply to Production=infra:apply:production",
+      "advisory": false,
+      "evidence_log": "reports/evidence/INFRA-STAGE-JOBS.log",
+      "audit_question": {
+        "id": "Q071",
+        "line": 71,
+        "slug": "are-the-init-validate-plan-apply-to-staging-ap",
+        "text": "Are the \"Init\", \"Validate\", \"Plan\", \"Apply to Staging\", \"Approval\", and \"Apply to production environment\" stages implemented correctly in the infrastructure pipeline?",
+        "section_id": "S063"
+      }
+    },
+    {
+      "id": "INFRA-GATE",
+      "label": "Approval is manual + blocking and gates 'Apply to Production'",
+      "verdict": "PASS",
+      "evidence": "approval is manual + allow_failure:false and Apply to Production needs it",
+      "advisory": false,
+      "evidence_log": "reports/evidence/INFRA-GATE.log",
+      "audit_question": {
+        "id": "Q071",
+        "line": 71,
+        "slug": "are-the-init-validate-plan-apply-to-staging-ap",
+        "text": "Are the \"Init\", \"Validate\", \"Plan\", \"Apply to Staging\", \"Approval\", and \"Apply to production environment\" stages implemented correctly in the infrastructure pipeline?",
+        "section_id": "S063"
+      }
+    },
+    {
+      "id": "INFRA-ENVIRONMENTS",
+      "label": "Independent staging + production environments with full file contracts",
+      "verdict": "PASS",
+      "evidence": "2 independent environments with identical file contracts (main/variables/outputs/tfvars)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/INFRA-ENVIRONMENTS.log",
+      "audit_question": {
+        "id": "Q065",
+        "line": 65,
+        "slug": "did-the-student-deploy-the-infrastructure-of-t",
+        "text": "Did the student deploy the infrastructure of the `cloud-design` project and the source code of `crud-master` project for two environments (staging, prod) on a cloud platform (e.g., AWS, Azure, or Google Cloud) using `Terraform`?",
+        "section_id": "S063"
+      }
+    },
+    {
+      "id": "INFRA-PARITY",
+      "label": "Staging/production share file contract and module wiring",
+      "verdict": "PASS",
+      "evidence": "both environments wire the same 5 modules from the same sources; only sizing overrides differ",
+      "advisory": false,
+      "evidence_log": "reports/evidence/INFRA-PARITY.log",
+      "audit_question": {
+        "id": "Q067",
+        "line": 67,
+        "slug": "are-the-two-environments-similar-in-design-res",
+        "text": "Are the two environments similar in design, resources and services used?",
+        "section_id": "S063"
+      }
+    },
+    {
+      "id": "INFRA-INDEPENDENT",
+      "label": "Infrastructure owns its own pipeline with a protected-branch gate",
+      "verdict": "INFO",
+      "evidence": "infra/ owns its own pipeline building infra/**, but workflow:rules also triggers on [$CI_PIPELINE_SOURCE == \"merge_request_event\"; $CI_COMMIT_BRANCH]; guideline 1 wording expects protected-branch-only triggers (main-only workflow seen in: CYB1-WORKFLOW)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/INFRA-INDEPENDENT.log",
+      "audit_question": {
+        "id": "Q069",
+        "line": 69,
+        "slug": "does-the-student-s-infrastructure-configuratio",
+        "text": "Does the student's infrastructure configuration exist in an independent repository with a configured pipeline?",
+        "section_id": "S063"
+      }
+    },
+    {
+      "id": "INFRA-FMT",
+      "label": "terraform fmt -check -recursive infra",
+      "verdict": "PASS",
+      "evidence": "terraform fmt -check -recursive infra: all files canonical",
+      "advisory": false,
+      "evidence_log": "reports/evidence/INFRA-FMT.log",
+      "audit_question": {
+        "id": "Q065",
+        "line": 65,
+        "slug": "did-the-student-deploy-the-infrastructure-of-t",
+        "text": "Did the student deploy the infrastructure of the `cloud-design` project and the source code of `crud-master` project for two environments (staging, prod) on a cloud platform (e.g., AWS, Azure, or Google Cloud) using `Terraform`?",
+        "section_id": "S063"
+      }
+    },
+    {
+      "id": "INFRA-VALIDATE-STAGING",
+      "label": "terraform validate \u2014 staging (offline path reported)",
+      "verdict": "PASS",
+      "evidence": "terraform validate succeeded for infra/environments/staging via vendored provider (.terraform/providers present, no init needed)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/INFRA-VALIDATE-STAGING.log",
+      "audit_question": {
+        "id": "Q065",
+        "line": 65,
+        "slug": "did-the-student-deploy-the-infrastructure-of-t",
+        "text": "Did the student deploy the infrastructure of the `cloud-design` project and the source code of `crud-master` project for two environments (staging, prod) on a cloud platform (e.g., AWS, Azure, or Google Cloud) using `Terraform`?",
+        "section_id": "S063"
+      }
+    },
+    {
+      "id": "INFRA-VALIDATE-PRODUCTION",
+      "label": "terraform validate \u2014 production (offline path reported)",
+      "verdict": "PASS",
+      "evidence": "terraform validate succeeded for infra/environments/production via vendored provider (.terraform/providers present, no init needed)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/INFRA-VALIDATE-PRODUCTION.log",
+      "audit_question": {
+        "id": "Q065",
+        "line": 65,
+        "slug": "did-the-student-deploy-the-infrastructure-of-t",
+        "text": "Did the student deploy the infrastructure of the `cloud-design` project and the source code of `crud-master` project for two environments (staging, prod) on a cloud platform (e.g., AWS, Azure, or Google Cloud) using `Terraform`?",
+        "section_id": "S063"
+      }
+    },
+    {
+      "id": "INFRA-NO-SECRETS",
+      "label": "No plaintext credentials in terraform.tfvars / variables.tf",
+      "verdict": "PASS",
+      "evidence": "no plaintext credentials in terraform; passwords arrive as TF_VAR_* from masked CI variables",
+      "advisory": false,
+      "evidence_log": "reports/evidence/INFRA-NO-SECRETS.log",
+      "audit_question": {
+        "id": "Q106",
+        "line": 106,
+        "slug": "have-the-students-separated-credentials-from-c",
+        "text": "Have the students separated credentials from code, using secure methods like secret management tools or environment variables?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CI-STAGES/api-gateway",
+      "label": "Each microservice declares exactly the seven CI/CD stages",
+      "verdict": "PASS",
+      "evidence": "api-gateway: the seven CI/CD stages are declared in order (effective list: Init -> Validate -> Plan -> Apply to Staging -> Build -> Test -> Scan -> Containerization -> Deploy to Staging -> Approval -> Deploy to Production -> Apply to Production)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-STAGES.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "CI-STAGES/billing-app",
+      "label": "Each microservice declares exactly the seven CI/CD stages",
+      "verdict": "PASS",
+      "evidence": "billing-app: the seven CI/CD stages are declared in order (effective list: Init -> Validate -> Plan -> Apply to Staging -> Build -> Test -> Scan -> Containerization -> Deploy to Staging -> Approval -> Deploy to Production -> Apply to Production)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-STAGES.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "CI-STAGES/inventory-app",
+      "label": "Each microservice declares exactly the seven CI/CD stages",
+      "verdict": "PASS",
+      "evidence": "inventory-app: the seven CI/CD stages are declared in order (effective list: Init -> Validate -> Plan -> Apply to Staging -> Build -> Test -> Scan -> Containerization -> Deploy to Staging -> Approval -> Deploy to Production -> Apply to Production)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-STAGES.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "CI-BUILD/api-gateway",
+      "label": "Build job compiles and packages the application",
+      "verdict": "PASS",
+      "evidence": "api-gateway: api-gateway:build:package",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-BUILD.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "CI-BUILD/billing-app",
+      "label": "Build job compiles and packages the application",
+      "verdict": "PASS",
+      "evidence": "billing-app: billing-app:build:package",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-BUILD.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "CI-BUILD/inventory-app",
+      "label": "Build job compiles and packages the application",
+      "verdict": "PASS",
+      "evidence": "inventory-app: inventory-app:build:package",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-BUILD.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "CI-TEST/api-gateway",
+      "label": "Test job runs the unit suite with coverage",
+      "verdict": "PASS",
+      "evidence": "api-gateway: api-gateway:test:unit executes pytest with coverage reporting",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-TEST.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "CI-TEST/billing-app",
+      "label": "Test job runs the unit suite with coverage",
+      "verdict": "PASS",
+      "evidence": "billing-app: billing-app:test:unit executes pytest with coverage reporting",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-TEST.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "CI-TEST/inventory-app",
+      "label": "Test job runs the unit suite with coverage",
+      "verdict": "PASS",
+      "evidence": "inventory-app: inventory-app:test:unit executes pytest with coverage reporting",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-TEST.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "CI-SCAN/api-gateway",
+      "label": "Scan jobs are real tool invocations, not decorative no-ops",
+      "verdict": "PASS",
+      "evidence": "api-gateway: 5 scan jobs, >=3 distinct scanners, none decorative",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-SCAN.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "CI-SCAN/billing-app",
+      "label": "Scan jobs are real tool invocations, not decorative no-ops",
+      "verdict": "PASS",
+      "evidence": "billing-app: 5 scan jobs, >=3 distinct scanners, none decorative",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-SCAN.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "CI-SCAN/inventory-app",
+      "label": "Scan jobs are real tool invocations, not decorative no-ops",
+      "verdict": "PASS",
+      "evidence": "inventory-app: 5 scan jobs, >=3 distinct scanners, none decorative",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-SCAN.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "CI-SCAN-NEGATIVE",
+      "label": "Negative control: 4 no-op scan jobs are rejected",
+      "verdict": "PASS",
+      "evidence": "fixture 4 no-op scan jobs -> detector said not ok (as required)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-SCAN-NEGATIVE.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "CI-SCAN-POSITIVE",
+      "label": "Negative control: 4 no-op scan jobs are rejected",
+      "verdict": "PASS",
+      "evidence": "fixture 3 real scanner jobs -> detector said ok (as required)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-SCAN-NEGATIVE.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "CI-CONTAINER/api-gateway",
+      "label": "Containerization builds, scans and pushes the image",
+      "verdict": "PASS",
+      "evidence": "api-gateway: api-gateway:containerize:docker,api-gateway:containerize:image_scan builds, scans and pushes the image",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-CONTAINER.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "CI-CONTAINER/billing-app",
+      "label": "Containerization builds, scans and pushes the image",
+      "verdict": "PASS",
+      "evidence": "billing-app: billing-app:containerize:docker,billing-app:containerize:image_scan builds, scans and pushes the image",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-CONTAINER.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "CI-CONTAINER/inventory-app",
+      "label": "Containerization builds, scans and pushes the image",
+      "verdict": "PASS",
+      "evidence": "inventory-app: inventory-app:containerize:docker,inventory-app:containerize:image_scan builds, scans and pushes the image",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-CONTAINER.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "CI-WORKFLOW/api-gateway",
+      "label": "workflow:rules restricts each pipeline to the protected branch",
+      "verdict": "INFO",
+      "evidence": "api-gateway: workflow:rules also triggers on [$CI_PIPELINE_SOURCE == \"merge_request_event\"; $CI_COMMIT_BRANCH] \u2014 deliberate CI-on-MR design, but audit guideline 1 asks for protected-branch-only triggers; destructive stages stay main-gated (proof: CYB1-JOBS)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-WORKFLOW.log",
+      "audit_question": {
+        "id": "Q104",
+        "line": 104,
+        "slug": "are-triggers-restricted-to-protected-branches-",
+        "text": "Are triggers restricted to protected branches, ensuring unauthorized users cannot deploy or tamper with the application?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CI-WORKFLOW/billing-app",
+      "label": "workflow:rules restricts each pipeline to the protected branch",
+      "verdict": "INFO",
+      "evidence": "billing-app: workflow:rules also triggers on [$CI_PIPELINE_SOURCE == \"merge_request_event\"; $CI_COMMIT_BRANCH] \u2014 deliberate CI-on-MR design, but audit guideline 1 asks for protected-branch-only triggers; destructive stages stay main-gated (proof: CYB1-JOBS)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-WORKFLOW.log",
+      "audit_question": {
+        "id": "Q104",
+        "line": 104,
+        "slug": "are-triggers-restricted-to-protected-branches-",
+        "text": "Are triggers restricted to protected branches, ensuring unauthorized users cannot deploy or tamper with the application?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CI-WORKFLOW/inventory-app",
+      "label": "workflow:rules restricts each pipeline to the protected branch",
+      "verdict": "INFO",
+      "evidence": "inventory-app: workflow:rules also triggers on [$CI_PIPELINE_SOURCE == \"merge_request_event\"; $CI_COMMIT_BRANCH] \u2014 deliberate CI-on-MR design, but audit guideline 1 asks for protected-branch-only triggers; destructive stages stay main-gated (proof: CYB1-JOBS)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CI-WORKFLOW.log",
+      "audit_question": {
+        "id": "Q104",
+        "line": 104,
+        "slug": "are-triggers-restricted-to-protected-branches-",
+        "text": "Are triggers restricted to protected branches, ensuring unauthorized users cannot deploy or tamper with the application?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CD-STAGES/api-gateway",
+      "label": "CD stages present with jobs in every microservice",
+      "verdict": "PASS",
+      "evidence": "api-gateway: Deploy to Staging=api-gateway:deploy:staging; Approval=api-gateway:approval:production; Deploy to Production=api-gateway:promote:image,api-gateway:deploy:production",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CD-STAGES.log",
+      "audit_question": {
+        "id": "Q088",
+        "line": 88,
+        "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+        "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+        "section_id": "S082"
+      }
+    },
+    {
+      "id": "CD-STAGES/billing-app",
+      "label": "CD stages present with jobs in every microservice",
+      "verdict": "PASS",
+      "evidence": "billing-app: Deploy to Staging=billing-app:deploy:staging; Approval=billing-app:approval:production; Deploy to Production=billing-app:promote:image,billing-app:deploy:production",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CD-STAGES.log",
+      "audit_question": {
+        "id": "Q088",
+        "line": 88,
+        "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+        "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+        "section_id": "S082"
+      }
+    },
+    {
+      "id": "CD-STAGES/inventory-app",
+      "label": "CD stages present with jobs in every microservice",
+      "verdict": "PASS",
+      "evidence": "inventory-app: Deploy to Staging=inventory-app:deploy:staging; Approval=inventory-app:approval:production; Deploy to Production=inventory-app:promote:image,inventory-app:deploy:production",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CD-STAGES.log",
+      "audit_question": {
+        "id": "Q088",
+        "line": 88,
+        "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+        "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+        "section_id": "S082"
+      }
+    },
+    {
+      "id": "CD-APPROVAL/api-gateway",
+      "label": "Approval jobs are manual AND allow_failure:false (blocking)",
+      "verdict": "PASS",
+      "evidence": "api-gateway: api-gateway:approval:production is a blocking manual gate",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CD-APPROVAL.log",
+      "audit_question": {
+        "id": "Q088",
+        "line": 88,
+        "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+        "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+        "section_id": "S082"
+      }
+    },
+    {
+      "id": "CD-APPROVAL/billing-app",
+      "label": "Approval jobs are manual AND allow_failure:false (blocking)",
+      "verdict": "PASS",
+      "evidence": "billing-app: billing-app:approval:production is a blocking manual gate",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CD-APPROVAL.log",
+      "audit_question": {
+        "id": "Q088",
+        "line": 88,
+        "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+        "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+        "section_id": "S082"
+      }
+    },
+    {
+      "id": "CD-APPROVAL/inventory-app",
+      "label": "Approval jobs are manual AND allow_failure:false (blocking)",
+      "verdict": "PASS",
+      "evidence": "inventory-app: inventory-app:approval:production is a blocking manual gate",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CD-APPROVAL.log",
+      "audit_question": {
+        "id": "Q088",
+        "line": 88,
+        "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+        "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+        "section_id": "S082"
+      }
+    },
+    {
+      "id": "CD-APPROVAL-FIXTURE",
+      "label": "Negative control: non-blocking approval gate is rejected",
+      "verdict": "PASS",
+      "evidence": "fixture non-blocking approval rejected: when=on_success (must be manual); allow_failure=True (must be false to block the pipeline)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CD-APPROVAL-FIXTURE.log",
+      "audit_question": {
+        "id": "Q088",
+        "line": 88,
+        "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+        "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+        "section_id": "S082"
+      }
+    },
+    {
+      "id": "CD-GATE/api-gateway",
+      "label": "Deploy to Production depends on approval + staging jobs",
+      "verdict": "PASS",
+      "evidence": "api-gateway: production deploy gated on approval + staging",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CD-GATE.log",
+      "audit_question": {
+        "id": "Q088",
+        "line": 88,
+        "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+        "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+        "section_id": "S082"
+      }
+    },
+    {
+      "id": "CD-GATE/billing-app",
+      "label": "Deploy to Production depends on approval + staging jobs",
+      "verdict": "PASS",
+      "evidence": "billing-app: production deploy gated on approval + staging",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CD-GATE.log",
+      "audit_question": {
+        "id": "Q088",
+        "line": 88,
+        "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+        "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+        "section_id": "S082"
+      }
+    },
+    {
+      "id": "CD-GATE/inventory-app",
+      "label": "Deploy to Production depends on approval + staging jobs",
+      "verdict": "PASS",
+      "evidence": "inventory-app: production deploy gated on approval + staging",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CD-GATE.log",
+      "audit_question": {
+        "id": "Q088",
+        "line": 88,
+        "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+        "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+        "section_id": "S082"
+      }
+    },
+    {
+      "id": "CD-STAGING/api-gateway",
+      "label": "Deploy to Staging targets a declared environment with a real command",
+      "verdict": "PASS",
+      "evidence": "api-gateway: staging deploy targets a declared environment with a real command",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CD-STAGING.log",
+      "audit_question": {
+        "id": "Q088",
+        "line": 88,
+        "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+        "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+        "section_id": "S082"
+      }
+    },
+    {
+      "id": "CD-STAGING/billing-app",
+      "label": "Deploy to Staging targets a declared environment with a real command",
+      "verdict": "PASS",
+      "evidence": "billing-app: staging deploy targets a declared environment with a real command",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CD-STAGING.log",
+      "audit_question": {
+        "id": "Q088",
+        "line": 88,
+        "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+        "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+        "section_id": "S082"
+      }
+    },
+    {
+      "id": "CD-STAGING/inventory-app",
+      "label": "Deploy to Staging targets a declared environment with a real command",
+      "verdict": "PASS",
+      "evidence": "inventory-app: staging deploy targets a declared environment with a real command",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CD-STAGING.log",
+      "audit_question": {
+        "id": "Q088",
+        "line": 88,
+        "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+        "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+        "section_id": "S082"
+      }
+    },
+    {
+      "id": "CD-ZERO-DOWNTIME/api-gateway",
+      "label": "Zero-downtime rollout evidence (rolling deploy + health wait)",
+      "verdict": "PASS",
+      "evidence": "api-gateway: rolling deployment with health/stability gating",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CD-ZERO-DOWNTIME.log",
+      "audit_question": {
+        "id": "Q088",
+        "line": 88,
+        "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+        "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+        "section_id": "S082"
+      }
+    },
+    {
+      "id": "CD-ZERO-DOWNTIME/billing-app",
+      "label": "Zero-downtime rollout evidence (rolling deploy + health wait)",
+      "verdict": "PASS",
+      "evidence": "billing-app: rolling deployment with health/stability gating",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CD-ZERO-DOWNTIME.log",
+      "audit_question": {
+        "id": "Q088",
+        "line": 88,
+        "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+        "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+        "section_id": "S082"
+      }
+    },
+    {
+      "id": "CD-ZERO-DOWNTIME/inventory-app",
+      "label": "Zero-downtime rollout evidence (rolling deploy + health wait)",
+      "verdict": "PASS",
+      "evidence": "inventory-app: rolling deployment with health/stability gating",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CD-ZERO-DOWNTIME.log",
+      "audit_question": {
+        "id": "Q088",
+        "line": 88,
+        "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+        "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+        "section_id": "S082"
+      }
+    },
+    {
+      "id": "FUNC-PYTEST/api-gateway",
+      "label": "Unit suites run green through uv + pytest-cov",
+      "verdict": "PASS",
+      "evidence": "uv run pytest: 7 passed in 0.35s",
+      "advisory": false,
+      "evidence_log": "reports/evidence/FUNC-PYTEST.log",
+      "audit_question": {
+        "id": "Q092",
+        "line": 92,
+        "slug": "are-the-pipelines-working-properly-and-updatin",
+        "text": "Are the pipelines working properly and updating the application and infrastructure after each modification in each repository?",
+        "section_id": "S090"
+      }
+    },
+    {
+      "id": "FUNC-PYTEST/billing-app",
+      "label": "Unit suites run green through uv + pytest-cov",
+      "verdict": "PASS",
+      "evidence": "uv run pytest: 32 passed in 2.13s",
+      "advisory": false,
+      "evidence_log": "reports/evidence/FUNC-PYTEST.log",
+      "audit_question": {
+        "id": "Q092",
+        "line": 92,
+        "slug": "are-the-pipelines-working-properly-and-updatin",
+        "text": "Are the pipelines working properly and updating the application and infrastructure after each modification in each repository?",
+        "section_id": "S090"
+      }
+    },
+    {
+      "id": "FUNC-PYTEST/inventory-app",
+      "label": "Unit suites run green through uv + pytest-cov",
+      "verdict": "PASS",
+      "evidence": "uv run pytest: 20 passed in 0.02s",
+      "advisory": false,
+      "evidence_log": "reports/evidence/FUNC-PYTEST.log",
+      "audit_question": {
+        "id": "Q092",
+        "line": 92,
+        "slug": "are-the-pipelines-working-properly-and-updatin",
+        "text": "Are the pipelines working properly and updating the application and infrastructure after each modification in each repository?",
+        "section_id": "S090"
+      }
+    },
+    {
+      "id": "FUNC-COMPILE",
+      "label": "python3 -m compileall succeeds for every service",
+      "verdict": "PASS",
+      "evidence": "python3 -m compileall: 3 service(s) compile cleanly",
+      "advisory": false,
+      "evidence_log": "reports/evidence/FUNC-COMPILE.log",
+      "audit_question": {
+        "id": "Q092",
+        "line": 92,
+        "slug": "are-the-pipelines-working-properly-and-updatin",
+        "text": "Are the pipelines working properly and updating the application and infrastructure after each modification in each repository?",
+        "section_id": "S090"
+      }
+    },
+    {
+      "id": "FUNC-HADOLINT",
+      "label": "hadolint (error threshold) clean on every Dockerfile",
+      "verdict": "PASS",
+      "evidence": "0 hadolint errors in 3 Dockerfile(s); 3 advisory warning(s) not gating",
+      "advisory": false,
+      "evidence_log": "reports/evidence/FUNC-HADOLINT.log",
+      "audit_question": {
+        "id": "Q092",
+        "line": 92,
+        "slug": "are-the-pipelines-working-properly-and-updatin",
+        "text": "Are the pipelines working properly and updating the application and infrastructure after each modification in each repository?",
+        "section_id": "S090"
+      }
+    },
+    {
+      "id": "FUNC-SHELL",
+      "label": "bash -n succeeds for every shell script in the repo",
+      "verdict": "PASS",
+      "evidence": "bash -n clean on all 5 shell scripts",
+      "advisory": false,
+      "evidence_log": "reports/evidence/FUNC-SHELL.log",
+      "audit_question": {
+        "id": "Q092",
+        "line": 92,
+        "slug": "are-the-pipelines-working-properly-and-updatin",
+        "text": "Are the pipelines working properly and updating the application and infrastructure after each modification in each repository?",
+        "section_id": "S090"
+      }
+    },
+    {
+      "id": "FUNC-YAML",
+      "label": "Every CI/playbook YAML file parses (incl. openapi.yaml)",
+      "verdict": "PASS",
+      "evidence": "20 YAML files parsed cleanly",
+      "advisory": false,
+      "evidence_log": "reports/evidence/FUNC-YAML.log",
+      "audit_question": {
+        "id": "Q092",
+        "line": 92,
+        "slug": "are-the-pipelines-working-properly-and-updatin",
+        "text": "Are the pipelines working properly and updating the application and infrastructure after each modification in each repository?",
+        "section_id": "S090"
+      }
+    },
+    {
+      "id": "FUNC-APPLY",
+      "label": "Pipelines really apply infra and deploy (terraform apply / ECS)",
+      "verdict": "PASS",
+      "evidence": "2 terraform apply command(s) (both environments, -auto-approve) and 3 service deploy(s) wired",
+      "advisory": false,
+      "evidence_log": "reports/evidence/FUNC-APPLY.log",
+      "audit_question": {
+        "id": "Q092",
+        "line": 92,
+        "slug": "are-the-pipelines-working-properly-and-updatin",
+        "text": "Are the pipelines working properly and updating the application and infrastructure after each modification in each repository?",
+        "section_id": "S090"
+      }
+    },
+    {
+      "id": "FUNC-LIVE-PIPELINE",
+      "label": "LIVE GitLab pipeline run on the deployed instance",
+      "verdict": "BLOCKED-EXTERNAL",
+      "evidence": "GitLab at 192.168.56.10 is not reachable from this machine. Live proof the auditor wants: push a commit to main and show the pipeline/job log (or: curl -s https://192.168.56.10/api/v4/projects | jq '.[].last_activity_at')",
+      "advisory": false,
+      "evidence_log": "reports/evidence/FUNC-LIVE-PIPELINE.log",
+      "audit_question": {
+        "id": "Q092",
+        "line": 92,
+        "slug": "are-the-pipelines-working-properly-and-updatin",
+        "text": "Are the pipelines working properly and updating the application and infrastructure after each modification in each repository?",
+        "section_id": "S090"
+      }
+    },
+    {
+      "id": "CYB1-JOBS",
+      "label": "Every apply/deploy/approval job carries the protected-branch rule",
+      "verdict": "PASS",
+      "evidence": "21 apply/deploy/approval jobs across 4 pipelines all require main",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB1-JOBS.log",
+      "audit_question": {
+        "id": "Q104",
+        "line": 104,
+        "slug": "are-triggers-restricted-to-protected-branches-",
+        "text": "Are triggers restricted to protected branches, ensuring unauthorized users cannot deploy or tamper with the application?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CYB1-WORKFLOW",
+      "label": "No unprotected workflow entrypoint in any pipeline",
+      "verdict": "PASS",
+      "evidence": "4 pipelines refuse every branch except main",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB1-WORKFLOW.log",
+      "audit_question": {
+        "id": "Q104",
+        "line": 104,
+        "slug": "are-triggers-restricted-to-protected-branches-",
+        "text": "Are triggers restricted to protected branches, ensuring unauthorized users cannot deploy or tamper with the application?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CYB1-NEGATIVE",
+      "label": "Negative control: pipeline with zero protected jobs is rejected",
+      "verdict": "PASS",
+      "evidence": "fixture pipeline with zero protected-branch rules is correctly rejected",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB1-NEGATIVE.log",
+      "audit_question": {
+        "id": "Q104",
+        "line": 104,
+        "slug": "are-triggers-restricted-to-protected-branches-",
+        "text": "Are triggers restricted to protected branches, ensuring unauthorized users cannot deploy or tamper with the application?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CYB2-GITLEAKS",
+      "label": "gitleaks detect over the whole tree (covers *.sh)",
+      "verdict": "PASS",
+      "evidence": "gitleaks scanned the whole tree (incl. *.sh, *.tf, *.py) \u2014 no leaks",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB2-GITLEAKS.log",
+      "audit_question": {
+        "id": "Q106",
+        "line": 106,
+        "slug": "have-the-students-separated-credentials-from-c",
+        "text": "Have the students separated credentials from code, using secure methods like secret management tools or environment variables?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CYB2-ASSIGNMENT",
+      "label": "Assignment-style credential grep incl. *.sh, *.py, *.tfvars",
+      "verdict": "PASS",
+      "evidence": "no assignment-style credential literal in any .sh/.py/.tf/.tfvars/.yml (default values inside os.getenv are absent too)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB2-ASSIGNMENT.log",
+      "audit_question": {
+        "id": "Q106",
+        "line": 106,
+        "slug": "have-the-students-separated-credentials-from-c",
+        "text": "Have the students separated credentials from code, using secure methods like secret management tools or environment variables?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CYB2-GITIGNORE",
+      "label": "No tracked .env/key/pem/tfstate; .gitignore guards them",
+      "verdict": "PASS",
+      "evidence": "no credential artefact tracked; .gitignore guards .env, keys, *.tfstate, .terraform/",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB2-GITIGNORE.log",
+      "audit_question": {
+        "id": "Q106",
+        "line": 106,
+        "slug": "have-the-students-separated-credentials-from-c",
+        "text": "Have the students separated credentials from code, using secure methods like secret management tools or environment variables?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CYB2-ENV-SOURCED",
+      "label": "Infrastructure credentials come from env/CI variables, never literals",
+      "verdict": "PASS",
+      "evidence": "IaC/Ansible hold no credential literals; values arrive via lookup('env')/TF_VAR_* from masked CI variables",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB2-ENV-SOURCED.log",
+      "audit_question": {
+        "id": "Q106",
+        "line": 106,
+        "slug": "have-the-students-separated-credentials-from-c",
+        "text": "Have the students separated credentials from code, using secure methods like secret management tools or environment variables?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CYB3-DOCKER",
+      "label": "Container images run as non-root (last USER directive wins)",
+      "verdict": "PASS",
+      "evidence": "3 image(s) end as a non-root user",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB3-DOCKER.log",
+      "audit_question": {
+        "id": "Q108",
+        "line": 108,
+        "slug": "did-the-students-apply-the-least-privilege-pri",
+        "text": "Did the students apply the least privilege principle to limit user and service access to the minimum required level?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CYB3-SG-EXPOSURE",
+      "label": "No sensitive port exposed to 0.0.0.0/0 or ::/0 (ranges + IPv6)",
+      "verdict": "PASS",
+      "evidence": "no sensitive port open to the world; public surface limited to ['alb:80-80', 'alb:443-443']",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB3-SG-EXPOSURE.log",
+      "audit_question": {
+        "id": "Q108",
+        "line": 108,
+        "slug": "did-the-students-apply-the-least-privilege-pri",
+        "text": "Did the students apply the least privilege principle to limit user and service access to the minimum required level?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CYB3-SG-DATASTORE",
+      "label": "Data-store ingress is peer-SG only (world-open CIDR on a data-store port rejected); outbound CIDR inventoried",
+      "verdict": "PASS",
+      "evidence": "data-store ingress is peer-SG only; 8 CIDR rule(s) inventoried as outbound-only or non data-store-port",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB3-SG-DATASTORE.log",
+      "audit_question": {
+        "id": "Q108",
+        "line": 108,
+        "slug": "did-the-students-apply-the-least-privilege-pri",
+        "text": "Did the students apply the least privilege principle to limit user and service access to the minimum required level?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CYB3-SG-GAPS",
+      "label": "Unmanaged SG directions inventoried (rabbitmq/database egress, billing ingress)",
+      "verdict": "INFO",
+      "evidence": "2 unmanaged security-group direction(s): billing_app declares no ingress block; billing_app is granted ingress access by database,rabbitmq yet has no ingress of its own",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB3-SG-GAPS.log",
+      "audit_question": {
+        "id": "Q108",
+        "line": 108,
+        "slug": "did-the-students-apply-the-least-privilege-pri",
+        "text": "Did the students apply the least privilege principle to limit user and service access to the minimum required level?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CYB3-RDS",
+      "label": "RDS instances are private and storage-encrypted (least-privilege data tier)",
+      "verdict": "PASS",
+      "evidence": "2 RDS instance(s): private (publicly_accessible=false) and storage_encrypted=true",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB3-RDS.log",
+      "audit_question": {
+        "id": "Q108",
+        "line": 108,
+        "slug": "did-the-students-apply-the-least-privilege-pri",
+        "text": "Did the students apply the least privilege principle to limit user and service access to the minimum required level?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CYB3-NEGATIVE",
+      "label": "Negative control: world-open data-store ingress (5432, 5672/15672) rejected, peer-SG-only store accepted",
+      "verdict": "PASS",
+      "evidence": "3 fixture(s) judged as required: world-open data-store ingress (5432, 5672, 15672) rejected, peer-SG-only store with outbound 443 accepted",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB3-NEGATIVE.log",
+      "audit_question": {
+        "id": "Q108",
+        "line": 108,
+        "slug": "did-the-students-apply-the-least-privilege-pri",
+        "text": "Did the students apply the least privilege principle to limit user and service access to the minimum required level?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CYB4-FILE",
+      "label": ".github/dependabot.yml exists and parses",
+      "verdict": "PASS",
+      "evidence": "version 2 with 8 update entries",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB4-FILE.log",
+      "audit_question": {
+        "id": "Q110",
+        "line": 110,
+        "slug": "do-the-students-have-a-process-for-updating-de",
+        "text": "Do the students have a process for updating dependencies and tools regularly, automating updates, and monitoring for security advisories and patches?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CYB4-COVERAGE",
+      "label": "Dependabot covers every dependency manifest present in the repo",
+      "verdict": "PASS",
+      "evidence": "every pip/docker manifest is covered (docker:/srcs/api-gateway,/srcs/billing-app,/srcs/inventory-app, pip:/srcs/api-gateway,/srcs/billing-app,/srcs/inventory-app, terraform:/infra/environments/production,/infra/environments/staging)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB4-COVERAGE.log",
+      "audit_question": {
+        "id": "Q110",
+        "line": 110,
+        "slug": "do-the-students-have-a-process-for-updating-de",
+        "text": "Do the students have a process for updating dependencies and tools regularly, automating updates, and monitoring for security advisories and patches?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CYB4-TERRAFORM-EFFECTIVE",
+      "label": "Terraform ecosystem entry is effective, not a silent no-op",
+      "verdict": "PASS",
+      "evidence": "every terraform entry resolves to a real lock file, so provider pins do get security updates",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB4-TERRAFORM-EFFECTIVE.log",
+      "audit_question": {
+        "id": "Q110",
+        "line": 110,
+        "slug": "do-the-students-have-a-process-for-updating-de",
+        "text": "Do the students have a process for updating dependencies and tools regularly, automating updates, and monitoring for security advisories and patches?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CYB4-SCHEDULE",
+      "label": "Update cadence configured on every dependabot entry",
+      "verdict": "PASS",
+      "evidence": "all 8 entries scheduled (weekly)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB4-SCHEDULE.log",
+      "audit_question": {
+        "id": "Q110",
+        "line": 110,
+        "slug": "do-the-students-have-a-process-for-updating-de",
+        "text": "Do the students have a process for updating dependencies and tools regularly, automating updates, and monitoring for security advisories and patches?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "CYB4-RENOVATE",
+      "label": "Docs claim Renovate \u2014 is any Renovate automation wired up?",
+      "verdict": "INFO",
+      "evidence": "3 document(s) mention Renovate but no renovate config/workflow exists \u2014 the claim is cosmetic (dependabot is the only automation running)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/CYB4-RENOVATE.log",
+      "audit_question": {
+        "id": "Q110",
+        "line": 110,
+        "slug": "do-the-students-have-a-process-for-updating-de",
+        "text": "Do the students have a process for updating dependencies and tools regularly, automating updates, and monitoring for security advisories and patches?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "DOC-README",
+      "label": "README.md substantive and covers prerequisites/setup/config/usage",
+      "verdict": "PASS",
+      "evidence": "README.md: 41511 bytes / 525 lines covering prerequisites, setup, configuration and usage",
+      "advisory": false,
+      "evidence_log": "reports/evidence/DOC-README.log",
+      "audit_question": {
+        "id": "Q114",
+        "line": 114,
+        "slug": "does-the-readme-md-file-contain-all-the-necess",
+        "text": "Does the `README.md` file contain all the necessary information about the solution (prerequisites, setup, configuration, usage, ...)?",
+        "section_id": "S112"
+      }
+    },
+    {
+      "id": "DOC-README-SECTIONS",
+      "label": "README documents architecture, tools, verification, Q&A",
+      "verdict": "PASS",
+      "evidence": "README documents pipeline design, tools, setup commands, verification and the 16 roleplay answers",
+      "advisory": false,
+      "evidence_log": "reports/evidence/DOC-README-SECTIONS.log",
+      "audit_question": {
+        "id": "Q116",
+        "line": 116,
+        "slug": "is-the-documentation-provided-by-the-student-c",
+        "text": "Is the documentation provided by the student clear and complete, including well-structured diagrams and thorough descriptions?",
+        "section_id": "S112"
+      }
+    },
+    {
+      "id": "DOC-GUIDE",
+      "label": "docs/AUDIT_GUIDE.md substantive and covers every audit section",
+      "verdict": "PASS",
+      "evidence": "docs/AUDIT_GUIDE.md: 138662 bytes covering all 11 audit areas incl. live demo commands",
+      "advisory": false,
+      "evidence_log": "reports/evidence/DOC-GUIDE.log",
+      "audit_question": {
+        "id": "Q116",
+        "line": 116,
+        "slug": "is-the-documentation-provided-by-the-student-c",
+        "text": "Is the documentation provided by the student clear and complete, including well-structured diagrams and thorough descriptions?",
+        "section_id": "S112"
+      }
+    },
+    {
+      "id": "DOC-DIAGRAMS",
+      "label": "Audit guide + README carry diagrams (mermaid/ASCII)",
+      "verdict": "PASS",
+      "evidence": "9 diagrams (guide: 0 mermaid + 5 ascii; README: 0 mermaid + 4 ascii)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/DOC-DIAGRAMS.log",
+      "audit_question": {
+        "id": "Q116",
+        "line": 116,
+        "slug": "is-the-documentation-provided-by-the-student-c",
+        "text": "Is the documentation provided by the student clear and complete, including well-structured diagrams and thorough descriptions?",
+        "section_id": "S112"
+      }
+    },
+    {
+      "id": "DOC-QUESTION-COVERAGE",
+      "label": "Every audit.md question is answered in the guide",
+      "verdict": "PASS",
+      "evidence": "all 22 discovered audit questions are answered somewhere in docs/AUDIT_GUIDE.md",
+      "advisory": false,
+      "evidence_log": "reports/evidence/DOC-QUESTION-COVERAGE.log",
+      "audit_question": {
+        "id": "Q116",
+        "line": 116,
+        "slug": "is-the-documentation-provided-by-the-student-c",
+        "text": "Is the documentation provided by the student clear and complete, including well-structured diagrams and thorough descriptions?",
+        "section_id": "S112"
+      }
+    },
+    {
+      "id": "BONUS-IMPLEMENTED",
+      "label": "Bonus features genuinely present in code (inventory)",
+      "verdict": "PASS",
+      "evidence": "9 bonus feature(s) verifiable in code",
+      "advisory": false,
+      "evidence_log": "reports/evidence/BONUS-IMPLEMENTED.log",
+      "audit_question": {
+        "id": "Q120",
+        "line": 120,
+        "slug": "did-the-student-implemented-any-feature-or-any",
+        "text": "+Did the student implemented any feature or anything that you would consider a bonus?",
+        "section_id": "S112"
+      }
+    },
+    {
+      "id": "BONUS-CLAIMS",
+      "label": "Claims-vs-code audit of infracost/tfsec/terragrunt/renovate",
+      "verdict": "PASS",
+      "evidence": "no tool is over-claimed; 4 absent tool(s) are explicitly disclosed as not integrated: infracost, tfsec, terragrunt, renovate",
+      "advisory": false,
+      "evidence_log": "reports/evidence/BONUS-CLAIMS.log",
+      "audit_question": {
+        "id": "Q120",
+        "line": 120,
+        "slug": "did-the-student-implemented-any-feature-or-any",
+        "text": "+Did the student implemented any feature or anything that you would consider a bonus?",
+        "section_id": "S112"
+      }
+    },
+    {
+      "id": "BONUS-CRUDMASTER",
+      "label": "crud-master-derived services detectable in this repo",
+      "verdict": "INFO",
+      "evidence": "3 service(s) implement CRUD over crud-master style models; documented as crud-master",
+      "advisory": false,
+      "evidence_log": "reports/evidence/BONUS-CRUDMASTER.log",
+      "audit_question": {
+        "id": "Q122",
+        "line": 122,
+        "slug": "did-the-student-used-his-her-own-crud-master-s",
+        "text": "+Did the student used his/her own `crud-master` source code for this project?",
+        "section_id": "S112"
+      }
+    },
+    {
+      "id": "ADV-TFLINT",
+      "label": "tflint Terraform lint (advisory)",
+      "verdict": "INFO",
+      "evidence": "tflint: no issues in staging/production",
+      "advisory": false,
+      "evidence_log": "reports/evidence/ADV-TFLINT.log",
+      "audit_question": {
+        "id": "Q080",
+        "line": 80,
+        "slug": "are-the-build-test-scan-and-containerization-s",
+        "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+        "section_id": "S073"
+      }
+    },
+    {
+      "id": "ADV-CHECKOV",
+      "label": "checkov IaC policy scan (advisory)",
+      "verdict": "INFO",
+      "evidence": "checkov reported findings (rc=2); informational only (use --strict to gate)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/ADV-CHECKOV.log",
+      "audit_question": {
+        "id": "Q108",
+        "line": 108,
+        "slug": "did-the-students-apply-the-least-privilege-pri",
+        "text": "Did the students apply the least privilege principle to limit user and service access to the minimum required level?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "ADV-TFSEC",
+      "label": "tfsec IaC scan (advisory)",
+      "verdict": "INFO",
+      "evidence": "tfsec reported findings (rc=126); informational only (use --strict to gate)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/ADV-TFSEC.log",
+      "audit_question": {
+        "id": "Q108",
+        "line": 108,
+        "slug": "did-the-students-apply-the-least-privilege-pri",
+        "text": "Did the students apply the least privilege principle to limit user and service access to the minimum required level?",
+        "section_id": "S094"
+      }
+    },
+    {
+      "id": "ADV-TRIVY",
+      "label": "trivy config IaC misconfiguration scan (advisory)",
+      "verdict": "INFO",
+      "evidence": "trivy reported findings (rc=1); informational only (use --strict to gate)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/ADV-TRIVY.log",
+      "audit_question": {
+        "id": "Q065",
+        "line": 65,
+        "slug": "did-the-student-deploy-the-infrastructure-of-t",
+        "text": "Did the student deploy the infrastructure of the `cloud-design` project and the source code of `crud-master` project for two environments (staging, prod) on a cloud platform (e.g., AWS, Azure, or Google Cloud) using `Terraform`?",
+        "section_id": "S063"
+      }
+    },
+    {
+      "id": "ADV-YAMLLINT",
+      "label": "yamllint over pipelines and playbooks (advisory)",
+      "verdict": "INFO",
+      "evidence": "yamllint reported 604 finding(s) (mostly line-length; advisory)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/ADV-YAMLLINT.log",
+      "audit_question": {
+        "id": "Q116",
+        "line": 116,
+        "slug": "is-the-documentation-provided-by-the-student-c",
+        "text": "Is the documentation provided by the student clear and complete, including well-structured diagrams and thorough descriptions?",
+        "section_id": "S112"
+      }
+    },
+    {
+      "id": "ADV-SHELLCHECK",
+      "label": "shellcheck over repo scripts (advisory)",
+      "verdict": "INFO",
+      "evidence": "shellcheck clean on 5 scripts",
+      "advisory": false,
+      "evidence_log": "reports/evidence/ADV-SHELLCHECK.log",
+      "audit_question": {
+        "id": "Q116",
+        "line": 116,
+        "slug": "is-the-documentation-provided-by-the-student-c",
+        "text": "Is the documentation provided by the student clear and complete, including well-structured diagrams and thorough descriptions?",
+        "section_id": "S112"
+      }
+    },
+    {
+      "id": "ADV-ANSIBLELINT",
+      "label": "ansible-lint over ansible/ (advisory)",
+      "verdict": "INFO",
+      "evidence": "ansible-lint reported 0 profile finding(s) (advisory; YAML line-length dominates)",
+      "advisory": false,
+      "evidence_log": "reports/evidence/ADV-ANSIBLELINT.log",
+      "audit_question": {
+        "id": "Q059",
+        "line": 59,
+        "slug": "was-the-gitlab-instance-deployed-and-configure",
+        "text": "Was the GitLab instance deployed and configured successfully using Ansible?",
+        "section_id": "S057"
+      }
+    }
   ],
   "questions": [
     {
@@ -104,9 +1590,14 @@
       "slug": "are-all-the-required-files-present",
       "text": "Are all the required files present?",
       "section_id": "S003",
-      "verdict": "SKIP(manual)",
-      "controls": [],
-      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
+      "verdict": "PASS",
+      "controls": [
+        "FILES-ANSIBLE",
+        "FILES-PIPELINES",
+        "FILES-REQUIRED",
+        "FILES-SUBSTANTIVE"
+      ],
+      "evidence": "all 39 audit-named artefacts present (3 microservices, 2 terraform environments)"
     },
     {
       "id": "Q051",
@@ -144,36 +1635,6 @@
       "slug": "was-the-gitlab-instance-deployed-and-configure",
       "text": "Was the GitLab instance deployed and configured successfully using Ansible?",
       "section_id": "S057",
-      "verdict": "SKIP(manual)",
-      "controls": [],
-      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
-    },
-    {
-      "id": "Q061",
-      "line": 61,
-      "slug": "are-the-gitlab-runners-integrated-with-the-exi",
-      "text": "Are the GitLab Runners integrated with the existing pipeline and executing tasks as expected for all repositories?",
-      "section_id": "S057",
-      "verdict": "SKIP(manual)",
-      "controls": [],
-      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
-    },
-    {
-      "id": "Q065",
-      "line": 65,
-      "slug": "did-the-student-deploy-the-infrastructure-of-t",
-      "text": "Did the student deploy the infrastructure of the `cloud-design` project and the source code of `crud-master` project for two environments (staging, prod) on a cloud platform (e.g., AWS, Azure, or Google Cloud) using `Terraform`?",
-      "section_id": "S063",
-      "verdict": "SKIP(manual)",
-      "controls": [],
-      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
-    },
-    {
-      "id": "Q067",
-      "line": 67,
-      "slug": "are-the-two-environments-similar-in-design-res",
-      "text": "Are the two environments similar in design, resources and services used?",
-      "section_id": "S063",
       "verdict": "BLOCKED-EXTERNAL",
       "controls": [
         "ADV-ANSIBLELINT",
@@ -186,11 +1647,11 @@
       "evidence": "2/2 playbooks pass ansible-playbook --syntax-check"
     },
     {
-      "id": "Q069",
-      "line": 69,
-      "slug": "does-the-student-s-infrastructure-configuratio",
-      "text": "Does the student's infrastructure configuration exist in an independent repository with a configured pipeline?",
-      "section_id": "S063",
+      "id": "Q061",
+      "line": 61,
+      "slug": "are-the-gitlab-runners-integrated-with-the-exi",
+      "text": "Are the GitLab Runners integrated with the existing pipeline and executing tasks as expected for all repositories?",
+      "section_id": "S057",
       "verdict": "BLOCKED-EXTERNAL",
       "controls": [
         "RUNNER-FILES",
@@ -200,21 +1661,11 @@
       "evidence": "docker executor rendered from config.toml.j2; registration passes --tag-list; privileged=templated false"
     },
     {
-      "id": "Q071",
-      "line": 71,
-      "slug": "are-the-init-validate-plan-apply-to-staging-ap",
-      "text": "Are the \"Init\", \"Validate\", \"Plan\", \"Apply to Staging\", \"Approval\", and \"Apply to production environment\" stages implemented correctly in the infrastructure pipeline?",
+      "id": "Q065",
+      "line": 65,
+      "slug": "did-the-student-deploy-the-infrastructure-of-t",
+      "text": "Did the student deploy the infrastructure of the `cloud-design` project and the source code of `crud-master` project for two environments (staging, prod) on a cloud platform (e.g., AWS, Azure, or Google Cloud) using `Terraform`?",
       "section_id": "S063",
-      "verdict": "SKIP(manual)",
-      "controls": [],
-      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
-    },
-    {
-      "id": "Q080",
-      "line": 80,
-      "slug": "are-the-build-test-scan-and-containerization-s",
-      "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
-      "section_id": "S073",
       "verdict": "INFO",
       "controls": [
         "ADV-TRIVY",
@@ -226,11 +1677,11 @@
       "evidence": "2 independent environments with identical file contracts (main/variables/outputs/tfvars)"
     },
     {
-      "id": "Q088",
-      "line": 88,
-      "slug": "are-the-deploy-to-staging-approval-and-deploy-",
-      "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
-      "section_id": "S082",
+      "id": "Q067",
+      "line": 67,
+      "slug": "are-the-two-environments-similar-in-design-res",
+      "text": "Are the two environments similar in design, resources and services used?",
+      "section_id": "S063",
       "verdict": "PASS",
       "controls": [
         "INFRA-PARITY"
@@ -238,11 +1689,11 @@
       "evidence": "both environments wire the same 5 modules from the same sources; only sizing overrides differ"
     },
     {
-      "id": "Q092",
-      "line": 92,
-      "slug": "are-the-pipelines-working-properly-and-updatin",
-      "text": "Are the pipelines working properly and updating the application and infrastructure after each modification in each repository?",
-      "section_id": "S090",
+      "id": "Q069",
+      "line": 69,
+      "slug": "does-the-student-s-infrastructure-configuratio",
+      "text": "Does the student's infrastructure configuration exist in an independent repository with a configured pipeline?",
+      "section_id": "S063",
       "verdict": "INFO",
       "controls": [
         "INFRA-INDEPENDENT"
@@ -250,36 +1701,26 @@
       "evidence": "infra/ owns its own pipeline building infra/**, but workflow:rules also triggers on [$CI_PIPELINE_SOURCE == \"merge_request_event\"; $CI_COMMIT_BRANCH]; guideline 1 wording expects protected-branch-only triggers (main-only workflow seen in: CYB1-WORKFLOW)"
     },
     {
-      "id": "Q104",
-      "line": 104,
-      "slug": "are-triggers-restricted-to-protected-branches-",
-      "text": "Are triggers restricted to protected branches, ensuring unauthorized users cannot deploy or tamper with the application?",
-      "section_id": "S094",
+      "id": "Q071",
+      "line": 71,
+      "slug": "are-the-init-validate-plan-apply-to-staging-ap",
+      "text": "Are the \"Init\", \"Validate\", \"Plan\", \"Apply to Staging\", \"Approval\", and \"Apply to production environment\" stages implemented correctly in the infrastructure pipeline?",
+      "section_id": "S063",
       "verdict": "PASS",
       "controls": [
         "INFRA-GATE",
         "INFRA-STAGE-JOBS",
         "INFRA-STAGES"
       ],
-      "evidence": "stages: Init -> Validate -> Plan -> Apply to Staging -> Approval -> Apply to Production"
+      "evidence": "the six required stages are declared in order (effective list: Init -> Validate -> Plan -> Apply to Staging -> Build -> Test -> Scan -> Containerization -> Deploy to Staging -> Approval -> Deploy to Production -> Apply to Production)"
     },
     {
-      "id": "Q106",
-      "line": 106,
-      "slug": "have-the-students-separated-credentials-from-c",
-      "text": "Have the students separated credentials from code, using secure methods like secret management tools or environment variables?",
-      "section_id": "S094",
-      "verdict": "SKIP(manual)",
-      "controls": [],
-      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
-    },
-    {
-      "id": "Q108",
-      "line": 108,
-      "slug": "did-the-students-apply-the-least-privilege-pri",
-      "text": "Did the students apply the least privilege principle to limit user and service access to the minimum required level?",
-      "section_id": "S094",
-      "verdict": "FAIL",
+      "id": "Q080",
+      "line": 80,
+      "slug": "are-the-build-test-scan-and-containerization-s",
+      "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
+      "section_id": "S073",
+      "verdict": "INFO",
       "controls": [
         "ADV-TFLINT",
         "CI-BUILD/api-gateway",
@@ -300,25 +1741,15 @@
         "CI-TEST/billing-app",
         "CI-TEST/inventory-app"
       ],
-      "evidence": "api-gateway: Scan stage is not genuine (decorative/no-op scan jobs: scan:dependencies(image=python:3.11-alpine,tools=none))"
+      "evidence": "api-gateway: the seven CI/CD stages are declared in order (effective list: Init -> Validate -> Plan -> Apply to Staging -> Build -> Test -> Scan -> Containerization -> Deploy to Staging -> Approval -> Deploy to Production -> Apply to Production)"
     },
     {
-      "id": "Q110",
-      "line": 110,
-      "slug": "do-the-students-have-a-process-for-updating-de",
-      "text": "Do the students have a process for updating dependencies and tools regularly, automating updates, and monitoring for security advisories and patches?",
-      "section_id": "S094",
-      "verdict": "SKIP(manual)",
-      "controls": [],
-      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
-    },
-    {
-      "id": "Q114",
-      "line": 114,
-      "slug": "does-the-readme-md-file-contain-all-the-necess",
-      "text": "Does the `README.md` file contain all the necessary information about the solution (prerequisites, setup, configuration, usage, ...)?",
-      "section_id": "S112",
-      "verdict": "FAIL",
+      "id": "Q088",
+      "line": 88,
+      "slug": "are-the-deploy-to-staging-approval-and-deploy-",
+      "text": "Are the \"Deploy to Staging\", \"Approval\", and \"Deploy to Production\" stages implemented correctly in the CD pipeline for each repository?",
+      "section_id": "S082",
+      "verdict": "PASS",
       "controls": [
         "CD-APPROVAL-FIXTURE",
         "CD-APPROVAL/api-gateway",
@@ -337,24 +1768,14 @@
         "CD-ZERO-DOWNTIME/billing-app",
         "CD-ZERO-DOWNTIME/inventory-app"
       ],
-      "evidence": "api-gateway: promote:image has no rolling/force-new-deployment mechanism; promote:image does not wait for health/stability"
+      "evidence": "api-gateway: Deploy to Staging=api-gateway:deploy:staging; Approval=api-gateway:approval:production; Deploy to Production=api-gateway:promote:image,api-gateway:deploy:production"
     },
     {
-      "id": "Q116",
-      "line": 116,
-      "slug": "is-the-documentation-provided-by-the-student-c",
-      "text": "Is the documentation provided by the student clear and complete, including well-structured diagrams and thorough descriptions?",
-      "section_id": "S112",
-      "verdict": "SKIP(manual)",
-      "controls": [],
-      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
-    },
-    {
-      "id": "Q120",
-      "line": 120,
-      "slug": "did-the-student-implemented-any-feature-or-any",
-      "text": "+Did the student implemented any feature or anything that you would consider a bonus?",
-      "section_id": "S112",
+      "id": "Q092",
+      "line": 92,
+      "slug": "are-the-pipelines-working-properly-and-updatin",
+      "text": "Are the pipelines working properly and updating the application and infrastructure after each modification in each repository?",
+      "section_id": "S090",
       "verdict": "BLOCKED-EXTERNAL",
       "controls": [
         "FUNC-APPLY",
@@ -367,24 +1788,14 @@
         "FUNC-SHELL",
         "FUNC-YAML"
       ],
-      "evidence": "uv run pytest: 6 passed in 0.31s"
+      "evidence": "uv run pytest: 7 passed in 0.35s"
     },
     {
-      "id": "Q122",
-      "line": 122,
-      "slug": "did-the-student-used-his-her-own-crud-master-s",
-      "text": "+Did the student used his/her own `crud-master` source code for this project?",
-      "section_id": "S112",
-      "verdict": "SKIP(manual)",
-      "controls": [],
-      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
-    },
-    {
-      "id": "Q124",
-      "line": 124,
-      "slug": "is-this-project-an-outstanding-project",
-      "text": "+Is this project an outstanding project?",
-      "section_id": "S112",
+      "id": "Q104",
+      "line": 104,
+      "slug": "are-triggers-restricted-to-protected-branches-",
+      "text": "Are triggers restricted to protected branches, ensuring unauthorized users cannot deploy or tamper with the application?",
+      "section_id": "S094",
       "verdict": "INFO",
       "controls": [
         "CI-WORKFLOW/api-gateway",
@@ -395,6 +1806,122 @@
         "CYB1-WORKFLOW"
       ],
       "evidence": "api-gateway: workflow:rules also triggers on [$CI_PIPELINE_SOURCE == \"merge_request_event\"; $CI_COMMIT_BRANCH] \u2014 deliberate CI-on-MR design, but audit guideline 1 asks for protected-branch-only triggers; destructive stages stay main-gated (proof: CYB1-JOBS)"
+    },
+    {
+      "id": "Q106",
+      "line": 106,
+      "slug": "have-the-students-separated-credentials-from-c",
+      "text": "Have the students separated credentials from code, using secure methods like secret management tools or environment variables?",
+      "section_id": "S094",
+      "verdict": "PASS",
+      "controls": [
+        "ANSIBLE-NOSECRET",
+        "CYB2-ASSIGNMENT",
+        "CYB2-ENV-SOURCED",
+        "CYB2-GITIGNORE",
+        "CYB2-GITLEAKS",
+        "INFRA-NO-SECRETS"
+      ],
+      "evidence": "no committed token/password literals; 4 file(s) source secrets from environment lookups"
+    },
+    {
+      "id": "Q108",
+      "line": 108,
+      "slug": "did-the-students-apply-the-least-privilege-pri",
+      "text": "Did the students apply the least privilege principle to limit user and service access to the minimum required level?",
+      "section_id": "S094",
+      "verdict": "INFO",
+      "controls": [
+        "ADV-CHECKOV",
+        "ADV-TFSEC",
+        "CYB3-DOCKER",
+        "CYB3-NEGATIVE",
+        "CYB3-RDS",
+        "CYB3-SG-DATASTORE",
+        "CYB3-SG-EXPOSURE",
+        "CYB3-SG-GAPS"
+      ],
+      "evidence": "3 image(s) end as a non-root user"
+    },
+    {
+      "id": "Q110",
+      "line": 110,
+      "slug": "do-the-students-have-a-process-for-updating-de",
+      "text": "Do the students have a process for updating dependencies and tools regularly, automating updates, and monitoring for security advisories and patches?",
+      "section_id": "S094",
+      "verdict": "INFO",
+      "controls": [
+        "CYB4-COVERAGE",
+        "CYB4-FILE",
+        "CYB4-RENOVATE",
+        "CYB4-SCHEDULE",
+        "CYB4-TERRAFORM-EFFECTIVE"
+      ],
+      "evidence": "version 2 with 8 update entries"
+    },
+    {
+      "id": "Q114",
+      "line": 114,
+      "slug": "does-the-readme-md-file-contain-all-the-necess",
+      "text": "Does the `README.md` file contain all the necessary information about the solution (prerequisites, setup, configuration, usage, ...)?",
+      "section_id": "S112",
+      "verdict": "PASS",
+      "controls": [
+        "DOC-README"
+      ],
+      "evidence": "README.md: 41511 bytes / 525 lines covering prerequisites, setup, configuration and usage"
+    },
+    {
+      "id": "Q116",
+      "line": 116,
+      "slug": "is-the-documentation-provided-by-the-student-c",
+      "text": "Is the documentation provided by the student clear and complete, including well-structured diagrams and thorough descriptions?",
+      "section_id": "S112",
+      "verdict": "INFO",
+      "controls": [
+        "ADV-SHELLCHECK",
+        "ADV-YAMLLINT",
+        "DOC-DIAGRAMS",
+        "DOC-GUIDE",
+        "DOC-QUESTION-COVERAGE",
+        "DOC-README-SECTIONS"
+      ],
+      "evidence": "README documents pipeline design, tools, setup commands, verification and the 16 roleplay answers"
+    },
+    {
+      "id": "Q120",
+      "line": 120,
+      "slug": "did-the-student-implemented-any-feature-or-any",
+      "text": "+Did the student implemented any feature or anything that you would consider a bonus?",
+      "section_id": "S112",
+      "verdict": "PASS",
+      "controls": [
+        "BONUS-CLAIMS",
+        "BONUS-IMPLEMENTED"
+      ],
+      "evidence": "9 bonus feature(s) verifiable in code"
+    },
+    {
+      "id": "Q122",
+      "line": 122,
+      "slug": "did-the-student-used-his-her-own-crud-master-s",
+      "text": "+Did the student used his/her own `crud-master` source code for this project?",
+      "section_id": "S112",
+      "verdict": "INFO",
+      "controls": [
+        "BONUS-CRUDMASTER"
+      ],
+      "evidence": "3 service(s) implement CRUD over crud-master style models; documented as crud-master"
+    },
+    {
+      "id": "Q124",
+      "line": 124,
+      "slug": "is-this-project-an-outstanding-project",
+      "text": "+Is this project an outstanding project?",
+      "section_id": "S112",
+      "verdict": "SKIP(manual)",
+      "controls": [],
+      "evidence": "no local control: answered live from README section 6 / docs/AUDIT_GUIDE.md 2.2"
     }
   ]
 }
