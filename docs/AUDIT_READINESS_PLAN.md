@@ -271,7 +271,7 @@ into three repos unless the auditor requires it: the CI files use
 
 | Step | Action |
 |---|---|
-| 7.1 | `.github/dependabot.yml` is inert: Dependabot does not support the terraform ecosystem outside the repo root, and a GitHub config cannot run in a GitLab-hosted project. Replace with a GitLab-native mechanism — a scheduled `scan:dependencies` job (already added for pip) plus a `validate:dependencies` job running `terraform outdated`, both reporting into a dashboard or job artifact |
+| 7.1 | `.github/dependabot.yml` is inert for one reason only: a GitHub config cannot run in a GitLab-hosted project. Its `terraform` entries now point at `infra/environments/staging` and `infra/environments/production` — the directories that actually contain a `.terraform.lock.hcl` — so the config would genuinely update the AWS provider pin on a GitHub mirror. Replace it with a GitLab-native mechanism — a scheduled `scan:dependencies` job (already added for pip) plus a `validate:dependencies` job running `terraform outdated`, both reporting into a dashboard or job artifact |
 | 7.2 | Fix `verify_security.sh` soundness: resolve `var.*` references, range-check egress ports, add a non-vacuity floor to the ingress loop, count egress *rules* not blocks, reject numeric `USER` UIDs, and make branch-protection matching per-disjunct. A control that passes while the property is false is worse than no control, because the student will assert it to an auditor |
 | 7.3 | Remove `.github/` entirely once 7.1 lands, so no dead config remains |
 

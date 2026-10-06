@@ -364,7 +364,7 @@ The platform enforces the 4 mandatory cybersecurity pillars:
 - Multi-tier automated security scanners integrated into CI pipelines:
   - `trivy fs` and `trivy image` for container and dependency vulnerabilities.
   - `bandit` for AST-level application security scanning.
-  - Dependabot configuration for `pip` and `docker` ecosystems is committed at `.github/dependabot.yml`; it is currently inert because the project is hosted on GitLab, where `.github/` automation does not execute (see [§7.1](#71-considered-but-not-implemented)).
+  - Dependabot configuration for the `pip`, `terraform` and `docker` ecosystems is committed at `.github/dependabot.yml`, with the `terraform` entries pointed at the directories that actually contain a `.terraform.lock.hcl` (`infra/environments/staging` and `infra/environments/production`); it is currently inert because the project is hosted on GitLab, where `.github/` automation does not execute (see [§7.1](#71-considered-but-not-implemented)).
   - Base Docker images built from stable Alpine Linux releases (`alpine:3.23`).
 
 ---
@@ -521,4 +521,4 @@ The following items from the brief's bonus list were evaluated and deliberately 
 | `tfsec` IaC scanning | Not integrated | `trivy config --severity HIGH,CRITICAL --exit-code 1 infra/` in the `Validate` stage (`infra/.gitlab-ci.yml`) |
 | `Infracost` cost estimation | Not integrated | `terraform plan` artifacts only; no cost comment on merge requests |
 | `Terragrunt` multi-environment DRY config | Not integrated | Plain Terraform roots `infra/environments/staging` and `infra/environments/production` consume the same modules; no `terragrunt.hcl` exists |
-| Renovate dependency bot | Not integrated | `.github/dependabot.yml` is present but `.github/` does not execute in this GitLab-hosted project, and its `terraform` entry targets a `directory` Dependabot does not support, so it is not an effective control |
+| Renovate dependency bot | Not integrated | `.github/dependabot.yml` is present and correctly targeted — its `terraform` entries point at `infra/environments/staging` and `infra/environments/production`, the two directories that actually hold a `.terraform.lock.hcl` — but `.github/` does not execute in this GitLab-hosted project, so it is not an effective control |

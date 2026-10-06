@@ -13,7 +13,11 @@ updates:
     schedule:
       interval: "weekly"
   - package-ecosystem: "terraform"
-    directory: "/infra"
+    directory: "/infra/environments/staging"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "terraform"
+    directory: "/infra/environments/production"
     schedule:
       interval: "weekly"
   - package-ecosystem: "docker"
