@@ -71,6 +71,7 @@ inventory-app:test:unit:
   - pwd
   script:
   - echo "=== [Test] Running Unit and Integration Test Suite ==="
+  - pip install --no-cache-dir -r requirements.txt pytest==9.1.1 pytest-cov==7.1.0
   - pytest --cov=app --cov-report=term-missing --junitxml=junit-report.xml tests/
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
@@ -116,6 +117,7 @@ inventory-app:scan:sast_bandit:
   - pwd
   script:
   - echo "=== [Scan] Executing Bandit AST Security Analysis ==="
+  - pip install --no-cache-dir bandit==1.9.4
   - bandit -r app/ -ll -ii -f screen
   allow_failure: false
 
@@ -277,6 +279,7 @@ inventory-app:scan:dependencies:
   - pwd
   script:
   - echo "=== [Scan] Reporting dependency advisories against requirements.txt (advisory only) ==="
+  - pip install --no-cache-dir pip-audit==2.10.1
   - |
     if pip-audit -r requirements.txt; then
       echo "=== [Scan] No known advisory matches the pinned dependencies ==="

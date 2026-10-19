@@ -85,3 +85,47 @@ audit asks for.
 
 **Verified**
 `/api/v4/version` reports 19.5.0, and the runner shows `status=online` in `/api/v4/runners/all`.
+
+## 2026-10-20 00:35 EEST: First live pipeline run on the local GitLab
+
+**What**
+- No repository files changed. The local runner pulled `python:3.11-alpine`, `hashicorp/terraform:1.6`
+  and `gitlab-runner-helper:x86_64-v19.5.0` while running the pipelines for commit `779d895`
+  (pushed by the user to the local GitLab as `main` and `fix/pipelines`).
+
+**Why**
+Live test of the CI fixes from the previous entries, as the user asked.
+
+**Verified**
+- GitLab's dry run accepted both refs (`valid=true`, 0 errors): 50 jobs on `main`, 28 on
+  `fix/pipelines`, so items 1, 2 and 10 of `docs/READINESS_REVIEW.md` are fixed on a real GitLab.
+- Both real pipelines were created and failed after about 90 seconds. `infra:init:staging` and
+  `infra:init:production` stopped on `TF_STATE_BUCKET CI protected variable is unset` (expected
+  without AWS). `pipeline:lint` failed on `apk add --no-cache pyyaml` with `pyyaml (no such
+  package)`, a new bug. Every other job (47 on `main`, 25 on the branch) was skipped because the
+  Init and Validate stages failed, so no test or scan job ran yet.
+
+## 2026-10-20 00:52 EEST: Fix pipeline:lint and install the CI test and scan tools
+
+**What**
+- `.gitlab-ci.yml`: `pipeline:lint` now runs `pip install --no-cache-dir pyyaml==6.0.3` instead of
+  `apk add --no-cache pyyaml`.
+- `srcs/api-gateway/.gitlab-ci.yml`, `srcs/inventory-app/.gitlab-ci.yml`, `srcs/billing-app/.gitlab-ci.yml`:
+  added one `pip install` line to each of three jobs per service: `test:unit` installs
+  `requirements.txt`, `pytest==9.1.1` and `pytest-cov==7.1.0`; `scan:sast_bandit` installs
+  `bandit==1.9.4`; `scan:dependencies` installs `pip-audit==2.10.1`.
+
+**Why**
+The first live run showed `pipeline:lint` failing with `pyyaml (no such package)`: Alpine names it
+`py3-yaml`, and even that would install for Alpine's Python, not the `/usr/local` Python of
+`python:3.11-alpine`. Item 3 of `docs/READINESS_REVIEW.md`: pytest, bandit and pip-audit were never
+installed in the job image. The tool versions are pinned to the current PyPI releases so runs are
+repeatable; the test set matches what `scripts/test_pipelines.sh` installs locally.
+
+**Verified**
+Each changed job was run locally in `python:3.11-alpine` on a copy of the working tree, using the
+job's own `before_script` and `script`: all 10 exited 0. pytest passed 7 (api-gateway), 20
+(inventory-app) and 32 (billing-app) tests; bandit found no issues; pip-audit found no advisories
+for inventory-app and billing-app, and reported PYSEC-2026-2275 in `requests 2.32.5` (fixed in
+2.33.0) for api-gateway, which the advisory-only job does not gate on. GitLab 19.5.0's CI Lint
+API still returns `valid=true` with 0 errors, and the `ci.json` schema check reports 0 errors.

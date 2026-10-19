@@ -94,7 +94,7 @@ pipeline:lint:
     - if: $CI_COMMIT_BRANCH
       when: always
   script:
-    - apk add --no-cache pyyaml
+    - pip install --no-cache-dir pyyaml==6.0.3
     - |
       echo "=== [CI] Every pipeline definition must parse, and the root must exist ==="
       test -f .gitlab-ci.yml || { echo "ERROR: no root .gitlab-ci.yml -- GitLab would create no pipeline"; exit 1; }
