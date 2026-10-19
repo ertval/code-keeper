@@ -228,6 +228,15 @@ resource "aws_ecs_task_definition" "inventory_app" {
           hostPort      = 8080
         }
       ]
+      # ECS ignores the Dockerfile HEALTHCHECK, so the same probe is repeated here.
+      # Without it the deploy jobs' services-stable wait only proves the task started.
+      healthCheck = {
+        command     = ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')\" || exit 1"]
+        interval    = 10
+        timeout     = 5
+        retries     = 6
+        startPeriod = 30
+      }
       environment = [
         { name = "APP_PORT", value = "8080" },
         # The app reads INVENTORY_DB_*; POSTGRES_* was never read by anything,
@@ -297,6 +306,15 @@ resource "aws_ecs_task_definition" "billing_app" {
           hostPort      = 8080
         }
       ]
+      # ECS ignores the Dockerfile HEALTHCHECK, so the same probe is repeated here.
+      # Without it the deploy jobs' services-stable wait only proves the task started.
+      healthCheck = {
+        command     = ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')\" || exit 1"]
+        interval    = 10
+        timeout     = 5
+        retries     = 6
+        startPeriod = 30
+      }
       environment = [
         { name = "APP_PORT", value = "8080" },
         # Matches srcs/billing-app/app/__init__.py, which reads BILLING_DB_*.

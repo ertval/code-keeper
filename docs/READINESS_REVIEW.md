@@ -95,6 +95,14 @@ Smaller issues:
     YAML turns each one into a one-key mapping, and GitLab requires every script entry to be a string,
     so it rejects the whole configuration. Found on 2026-10-19 by validating the files against
     GitLab's `ci.json` schema.
+11. **The Trivy IaC gate fails on plaintext passwords.** Once item 4 is fixed and
+    `infra:validate:security` reaches its scan, `trivy config` (0.76.0, from the unpinned
+    `aquasec/trivy:latest`) reports 8 CRITICAL `AWS-0036` findings: `INVENTORY_DB_PASSWORD`,
+    `BILLING_DB_PASSWORD` and `RABBITMQ_PASSWORD` are plain `environment` entries in the task
+    definitions (`infra/modules/compute/main.tf`), for both environments. `infra/.trivyignore` does
+    not cover them, so the job fails and every later infra stage is skipped. The fix is the one in
+    the security notes below: pass these values as `secrets` from Secrets Manager or SSM. Found on
+    2026-10-20 by running the job's scan locally.
 
 ### Why the committed audit report is green
 
@@ -197,7 +205,7 @@ Most of the remaining work is wiring and live setup, not new design.
 
 ## Suggested order
 
-1. Fix the pipeline bugs (section 2, items 1-10) and the two confirmed infra bugs (section 3).
+1. Fix the pipeline bugs (section 2, items 1-11) and the two confirmed infra bugs (section 3).
 2. Bring up a real GitLab instance and runner with the existing playbooks, then confirm runner
    registration and branch protection work on that GitLab version.
 3. Split `infra/` and the three apps into their own repositories on that GitLab.

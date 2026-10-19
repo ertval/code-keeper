@@ -49,10 +49,11 @@ infra:init:staging:
     expire_in: 1 day
 
   variables:
-    TF_VAR_image_repository_prefix: ${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}
+    DOCKERHUB_REPO: "grafido"
+    TF_VAR_image_repository_prefix: docker.io/${DOCKERHUB_REPO}
     TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
     TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    AWS_DEFAULT_REGION: "us-east-1"
   image: &id001
     name: hashicorp/terraform:1.6
     entrypoint: [""]
@@ -97,10 +98,11 @@ infra:init:production:
 # Stage 2: Validate
 # ------------------------------------------------------------------------------
   variables:
-    TF_VAR_image_repository_prefix: ${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}
+    DOCKERHUB_REPO: "grafido"
+    TF_VAR_image_repository_prefix: docker.io/${DOCKERHUB_REPO}
     TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
     TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    AWS_DEFAULT_REGION: "us-east-1"
   image: *id001
   before_script:
   - terraform --version
@@ -130,10 +132,11 @@ infra:validate:syntax:
   - cd ../production && terraform validate
 
   variables:
-    TF_VAR_image_repository_prefix: ${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}
+    DOCKERHUB_REPO: "grafido"
+    TF_VAR_image_repository_prefix: docker.io/${DOCKERHUB_REPO}
     TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
     TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    AWS_DEFAULT_REGION: "us-east-1"
   image: *id001
   before_script:
   - terraform --version
@@ -143,7 +146,7 @@ infra:validate:security:
     name: aquasec/trivy:latest
     entrypoint: [""]
   before_script:
-  - terraform --version
+  - trivy --version
   rules:
   - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     changes:
@@ -169,7 +172,7 @@ infra:validate:security:
 
   variables:
     TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    AWS_DEFAULT_REGION: "us-east-1"
 infra:validate:dependencies:
   stage: Validate
   rules:
@@ -188,7 +191,7 @@ infra:validate:dependencies:
 # ------------------------------------------------------------------------------
   variables:
     TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    AWS_DEFAULT_REGION: "us-east-1"
   image: *id001
   before_script:
   - terraform --version
@@ -224,10 +227,11 @@ infra:plan:staging:
     expire_in: 7 days
 
   variables:
-    TF_VAR_image_repository_prefix: ${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}
+    DOCKERHUB_REPO: "grafido"
+    TF_VAR_image_repository_prefix: docker.io/${DOCKERHUB_REPO}
     TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
     TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    AWS_DEFAULT_REGION: "us-east-1"
   image: *id001
   before_script:
   - terraform --version
@@ -266,10 +270,11 @@ infra:plan:production:
 # Stage 4: Apply to Staging (Automated on Protected Main Branch)
 # ------------------------------------------------------------------------------
   variables:
-    TF_VAR_image_repository_prefix: ${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}
+    DOCKERHUB_REPO: "grafido"
+    TF_VAR_image_repository_prefix: docker.io/${DOCKERHUB_REPO}
     TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
     TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    AWS_DEFAULT_REGION: "us-east-1"
   image: *id001
   before_script:
   - terraform --version
@@ -278,7 +283,12 @@ infra:apply:staging:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule"
     when: never
+  # Same changes: filter as infra:plan:staging, so the staging.tfplan this job
+  # applies exists whenever the job does.
   - if: $CI_COMMIT_BRANCH == "main"
+    changes:
+      paths:
+      - infra/**/*
   script:
   - cd infra/environments/staging
   - terraform apply -input=false -auto-approve staging.tfplan
@@ -290,10 +300,11 @@ infra:apply:staging:
 # Stage 5: Approval (Manual Gate for Production Promotion)
 # ------------------------------------------------------------------------------
   variables:
-    TF_VAR_image_repository_prefix: ${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}
+    DOCKERHUB_REPO: "grafido"
+    TF_VAR_image_repository_prefix: docker.io/${DOCKERHUB_REPO}
     TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
     TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    AWS_DEFAULT_REGION: "us-east-1"
   image: *id001
   before_script:
   - terraform --version
@@ -320,7 +331,7 @@ infra:approval:production:
 # ------------------------------------------------------------------------------
   variables:
     TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    AWS_DEFAULT_REGION: "us-east-1"
   image: *id001
   before_script:
   - terraform --version
@@ -345,10 +356,11 @@ infra:apply:production:
     name: production
     url: https://production.code-keeper.internal
   variables:
-    TF_VAR_image_repository_prefix: ${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}
+    DOCKERHUB_REPO: "grafido"
+    TF_VAR_image_repository_prefix: docker.io/${DOCKERHUB_REPO}
     TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
     TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    AWS_DEFAULT_REGION: "us-east-1"
   image: *id001
   before_script:
   - terraform --version

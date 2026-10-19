@@ -129,3 +129,71 @@ job's own `before_script` and `script`: all 10 exited 0. pytest passed 7 (api-ga
 for inventory-app and billing-app, and reported PYSEC-2026-2275 in `requests 2.32.5` (fixed in
 2.33.0) for api-gateway, which the advisory-only job does not gate on. GitLab 19.5.0's CI Lint
 API still returns `valid=true` with 0 errors, and the `ci.json` schema check reports 0 errors.
+
+## 2026-10-20 01:07 EEST: Second live pipeline run: all build, test and scan jobs green
+
+**What**
+- No repository files changed. The local runner pulled `aquasec/trivy:latest`,
+  `sonarsource/sonar-scanner-cli:latest` and `zricethezav/gitleaks:latest` while running pipeline 3
+  for commit `2b54962` on `fix/pipelines` (pushed by the user to the local GitLab).
+
+**Why**
+Live test of the `pipeline:lint` and item 3 fixes from the previous entry.
+
+**Verified**
+Pipeline 3 passed with 22 of 22 jobs, and no infra jobs were included because the commit did not
+touch `infra/`. The logs show the jobs did real work: pytest passed 7, 20 and 32 tests (coverage
+31%, 11%, 56%) and uploaded JUnit reports; bandit reported no issues; gitleaks reported no leaks;
+Trivy downloaded its database and found no HIGH or CRITICAL issue; pip-audit reported
+PYSEC-2026-2275 in `requests 2.32.5` for api-gateway (advisory only); the SonarQube jobs skipped
+the upload because no server is configured.
+
+## 2026-10-20 01:16 EEST: Fix review items 4-9 (pipeline) and record item 11
+
+**What**
+- `infra/.gitlab-ci.yml`:
+  - `infra:validate:security` runs `trivy --version` instead of `terraform --version` (item 4).
+  - `infra:apply:staging` only runs on `main` when `infra/**` changed, like `infra:plan:staging` (item 5).
+  - `TF_VAR_image_repository_prefix` is now `docker.io/${DOCKERHUB_REPO}` with a job-level default
+    `DOCKERHUB_REPO: "grafido"`, and `AWS_DEFAULT_REGION` is a plain `"us-east-1"` (item 7).
+- `srcs/api-gateway/.gitlab-ci.yml`, `srcs/inventory-app/.gitlab-ci.yml`, `srcs/billing-app/.gitlab-ci.yml`:
+  - `containerize:docker` writes the Kaniko `config.json` with the working `printf` already used by
+    `promote:image` (item 6).
+  - Image names are `docker.io/${DOCKERHUB_REPO}/<service>:<tag>`, with `DOCKERHUB_REPO: "grafido"`
+    as a job-level default, and `AWS_DEFAULT_REGION` is a plain `"us-east-1"` (item 7).
+  - The unreachable curl health checks against `*.code-keeper.internal` are gone, in both the
+    staging and the production deploy jobs (item 8). api-gateway now looks up the ALB DNS name
+    (`ALB_NAME`) with `aws elbv2 describe-load-balancers` and curls its `/health`; inventory-app and
+    billing-app rely on `aws ecs wait services-stable`, with a comment saying why.
+  - `deploy:production` rolls the service onto the immutable commit tag (`TARGET_IMAGE:
+    "${IMAGE_TAG}"`) instead of `production-latest`, and the comment above `promote:image` explains
+    why (item 9).
+- `infra/modules/compute/main.tf`: added an ECS `healthCheck` to the inventory-app and billing-app
+  container definitions, repeating each Dockerfile `HEALTHCHECK`, so `services-stable` only passes
+  once new tasks answer `/health` (item 8).
+- `docs/READINESS_REVIEW.md`: added item 11 (the Trivy IaC gate fails on 8 CRITICAL `AWS-0036`
+  plaintext-password findings) and pointed the suggested order at items 1-11.
+- Local GitLab only: scratch project `root/ci-scratch` (id 2) with a one-job variable probe and two
+  project variables (`DOCKERHUB_REPO`, `AWS_DEFAULT_REGION`).
+
+**Why**
+The user asked for items 4-9. For item 8 the gateway is checked through its public ALB, while
+inventory-app and billing-app are only reachable inside the VPC, so ECS health checks replace a
+probe the runner could never make. `docker.io/<namespace>/<service>` keeps Docker Hub's two-part
+repository names and still passes the Terraform `image_repository_prefix` validation (one slash).
+`AWS-0036` was not added to `.trivyignore`; the real fix is Secrets Manager or SSM `secrets`.
+
+**Verified**
+- GitLab 19.5.0 CI Lint: `valid=true`, 0 errors. `ci.json` schema: 0 errors in all five files. The
+  rules and needs simulation passes all 9 scenarios. `scripts/test_pipelines.sh`: 91 passed,
+  0 failed. `pipeline:lint` run locally: all checks OK.
+- The new Kaniko `printf` line, run in `python:3.11-alpine`, writes valid JSON.
+- Probe on the local GitLab: the old `${DOCKERHUB_REPO:-grafido}/...` value expanded to
+  `//api-gateway:<sha>`, even with `DOCKERHUB_REPO` set as a project variable. The new value gave
+  `docker.io/grafido/api-gateway:<sha>`, and project variables overrode both the namespace and the
+  region.
+- `terraform fmt -check` (1.6) passes on the compute module, and `terraform console` evaluates the
+  health check command to exactly the Dockerfile probe.
+- `trivy config` 0.76.0 fails on HEAD and on the working tree alike with 8 CRITICAL `AWS-0036`
+  findings, so item 11 predates these changes.
+- Not run: Kaniko push, deploy and Terraform jobs; they need Docker Hub and AWS credentials.

@@ -36,9 +36,10 @@ inventory-app:build:package:
   variables:
     APP_NAME: "inventory-app"
     APP_DIR: "srcs/inventory-app"
-    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    DOCKERHUB_REPO: "grafido"
+    IMAGE_TAG: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "us-east-1"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
   before_script:
@@ -86,9 +87,10 @@ inventory-app:test:unit:
   variables:
     APP_NAME: "inventory-app"
     APP_DIR: "srcs/inventory-app"
-    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    DOCKERHUB_REPO: "grafido"
+    IMAGE_TAG: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "us-east-1"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
 inventory-app:scan:sast_bandit:
@@ -124,9 +126,10 @@ inventory-app:scan:sast_bandit:
   variables:
     APP_NAME: "inventory-app"
     APP_DIR: "srcs/inventory-app"
-    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    DOCKERHUB_REPO: "grafido"
+    IMAGE_TAG: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "us-east-1"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
 inventory-app:scan:secret_detection:
@@ -159,9 +162,10 @@ inventory-app:scan:secret_detection:
   variables:
     APP_NAME: "inventory-app"
     APP_DIR: "srcs/inventory-app"
-    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    DOCKERHUB_REPO: "grafido"
+    IMAGE_TAG: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "us-east-1"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
   before_script:
@@ -198,9 +202,10 @@ inventory-app:scan:trivy_fs:
   variables:
     APP_NAME: "inventory-app"
     APP_DIR: "srcs/inventory-app"
-    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    DOCKERHUB_REPO: "grafido"
+    IMAGE_TAG: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "us-east-1"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
   before_script:
@@ -251,9 +256,10 @@ inventory-app:scan:sonarqube:
   variables:
     APP_NAME: "inventory-app"
     APP_DIR: "srcs/inventory-app"
-    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    DOCKERHUB_REPO: "grafido"
+    IMAGE_TAG: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "us-east-1"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
   before_script:
@@ -298,9 +304,10 @@ inventory-app:scan:dependencies:
   variables:
     APP_NAME: "inventory-app"
     APP_DIR: "srcs/inventory-app"
-    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    DOCKERHUB_REPO: "grafido"
+    IMAGE_TAG: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "us-east-1"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
 inventory-app:containerize:docker:
@@ -319,9 +326,10 @@ inventory-app:containerize:docker:
   variables:
     APP_NAME: "inventory-app"
     APP_DIR: "srcs/inventory-app"
-    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    DOCKERHUB_REPO: "grafido"
+    IMAGE_TAG: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "us-east-1"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
     DOCKER_CONFIG: "/workspace/.docker"
@@ -330,7 +338,7 @@ inventory-app:containerize:docker:
   - cd "${APP_DIR}"
   - pwd
   - mkdir -p "${DOCKER_CONFIG}"
-  - printf '{{"auths":{{"https://index.docker.io/v1/":{{"username":"{0}","password":"{1}"}}}}}}' "${DOCKERHUB_USERNAME}" "${DOCKERHUB_TOKEN}" > "${DOCKER_CONFIG}/config.json"
+  - printf '{"auths":{"https://index.docker.io/v1/":{"username":"%s","password":"%s"}}}' "${DOCKERHUB_USERNAME}" "${DOCKERHUB_TOKEN}" > "${DOCKER_CONFIG}/config.json"
   script:
   - echo "=== [Containerization] Building Docker Image with Kaniko (no privileged runner required) ==="
     # Pre-flight: kaniko resolves a relative --dockerfile against the build context, so
@@ -363,9 +371,10 @@ inventory-app:containerize:image_scan:
   variables:
     APP_NAME: "inventory-app"
     APP_DIR: "srcs/inventory-app"
-    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    DOCKERHUB_REPO: "grafido"
+    IMAGE_TAG: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "us-east-1"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
     TRIVY_USERNAME: "${DOCKERHUB_USERNAME}"
@@ -396,9 +405,10 @@ inventory-app:deploy:staging:
   variables:
     APP_NAME: "inventory-app"
     APP_DIR: "srcs/inventory-app"
-    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    DOCKERHUB_REPO: "grafido"
+    IMAGE_TAG: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "us-east-1"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
     TASK_FAMILY: "code-keeper-staging-${APP_NAME}"
@@ -439,8 +449,10 @@ inventory-app:deploy:staging:
       echo "Registered new task definition revision ${NEW_TASKDEF}"
       aws ecs update-service --cluster "${ECS_CLUSTER_STAGING}" --service "${SERVICE_NAME}" --task-definition "${NEW_TASKDEF}" --region "${AWS_DEFAULT_REGION:-us-east-1}"
     fi
+    # inventory-app is only reachable inside the VPC, so the runner cannot probe it.
+    # The task definition's ECS healthCheck calls /health instead, and
+    # services-stable only succeeds once the new tasks pass it.
   - aws ecs wait services-stable --cluster "${ECS_CLUSTER_STAGING}" --services "${SERVICE_NAME}" --region "${AWS_DEFAULT_REGION:-us-east-1}"
-  - curl -f --retry 5 --retry-delay 3 "http://staging.code-keeper.internal:8080/health"
 
 # ------------------------------------------------------------------------------
 # Stage 6: Approval (Manual Gate for Production Promotion)
@@ -466,13 +478,16 @@ inventory-app:approval:production:
 # ------------------------------------------------------------------------------
 # Moves the immutable commit tag onto the production-latest alias inside the
 # registry (a registry side copy, so no Docker daemon is required), then the
-# production service is rolled onto that alias.
+# production service is rolled onto the immutable commit tag itself. The alias
+# only records which release production runs: a reused tag would make every
+# later release look like the image already running, so nothing would roll.
   variables:
     APP_NAME: "inventory-app"
     APP_DIR: "srcs/inventory-app"
-    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    DOCKERHUB_REPO: "grafido"
+    IMAGE_TAG: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "us-east-1"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
   before_script:
@@ -494,9 +509,10 @@ inventory-app:promote:image:
   variables:
     APP_NAME: "inventory-app"
     APP_DIR: "srcs/inventory-app"
-    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    DOCKERHUB_REPO: "grafido"
+    IMAGE_TAG: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "us-east-1"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
     DOCKER_CONFIG: "/workspace/.docker"
@@ -536,14 +552,15 @@ inventory-app:deploy:production:
   variables:
     APP_NAME: "inventory-app"
     APP_DIR: "srcs/inventory-app"
-    IMAGE_TAG: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
-    IMAGE_PROD: "${DOCKERHUB_REPO:-grafido}/${DOCKERHUB_PROJECT:-code-keeper}/${APP_NAME}:production-latest"
-    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    DOCKERHUB_REPO: "grafido"
+    IMAGE_TAG: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:${CI_COMMIT_SHORT_SHA}"
+    IMAGE_PROD: "docker.io/${DOCKERHUB_REPO}/${APP_NAME}:production-latest"
+    AWS_DEFAULT_REGION: "us-east-1"
     ECS_CLUSTER_STAGING: "code-keeper-staging-cluster"
     ECS_CLUSTER_PROD: "code-keeper-production-cluster"
     TASK_FAMILY: "code-keeper-production-${APP_NAME}"
     SERVICE_NAME: "code-keeper-production-${APP_NAME}"
-    TARGET_IMAGE: "${IMAGE_PROD}"
+    TARGET_IMAGE: "${IMAGE_TAG}"
   before_script:
   - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
   - cd "${APP_DIR}"
@@ -572,5 +589,7 @@ inventory-app:deploy:production:
       echo "Registered new task definition revision ${NEW_TASKDEF}"
       aws ecs update-service --cluster "${ECS_CLUSTER_PROD}" --service "${SERVICE_NAME}" --task-definition "${NEW_TASKDEF}" --region "${AWS_DEFAULT_REGION:-us-east-1}"
     fi
+    # inventory-app is only reachable inside the VPC, so the runner cannot probe it.
+    # The task definition's ECS healthCheck calls /health instead, and
+    # services-stable only succeeds once the new tasks pass it.
   - aws ecs wait services-stable --cluster "${ECS_CLUSTER_PROD}" --services "${SERVICE_NAME}" --region "${AWS_DEFAULT_REGION:-us-east-1}"
-  - curl -f --retry 10 --retry-delay 5 "http://production.code-keeper.internal:8080/health"
