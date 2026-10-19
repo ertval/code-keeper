@@ -43,7 +43,7 @@ Line numbers refer to `srcs/api-gateway/.gitlab-ci.yml` unless stated otherwise.
 exist in `srcs/inventory-app/.gitlab-ci.yml` and `srcs/billing-app/.gitlab-ci.yml`, shifted by two
 lines after line 28.
 
-The first two stop GitLab from creating any pipeline at all.
+The first two, and item 10 below, stop GitLab from creating any pipeline at all.
 
 1. **Bad `rules:` in 9 jobs.** In `test:unit`, `scan:sast_bandit` and `scan:dependencies` for all three
    services, the `before_script` lines ended up inside the `rules:` list (`:70-72`, `:114-116`,
@@ -86,6 +86,15 @@ Smaller issues:
   "succeeds" through its `|| echo` fallback.
 - `infra:validate:syntax` and the plan jobs never run `terraform init`. They depend on a cache that the
   two parallel init jobs overwrite, so the first run is unreliable.
+
+### Found after the review
+
+10. **Script lines that YAML reads as mappings.** 71 `script:` entries in 23 jobs (13 in
+    `infra/.gitlab-ci.yml`, 20 in `srcs/api-gateway/.gitlab-ci.yml`, 19 in each of the other two)
+    contain `: ` without quotes, for example `- echo " Commit: ${CI_COMMIT_SHA} by ${GITLAB_USER_NAME}"`.
+    YAML turns each one into a one-key mapping, and GitLab requires every script entry to be a string,
+    so it rejects the whole configuration. Found on 2026-10-19 by validating the files against
+    GitLab's `ci.json` schema.
 
 ### Why the committed audit report is green
 
@@ -188,7 +197,7 @@ Most of the remaining work is wiring and live setup, not new design.
 
 ## Suggested order
 
-1. Fix the pipeline bugs (section 2, items 1-9) and the two confirmed infra bugs (section 3).
+1. Fix the pipeline bugs (section 2, items 1-10) and the two confirmed infra bugs (section 3).
 2. Bring up a real GitLab instance and runner with the existing playbooks, then confirm runner
    registration and branch protection work on that GitLab version.
 3. Split `infra/` and the three apps into their own repositories on that GitLab.
@@ -210,6 +219,7 @@ Most of the remaining work is wiring and live setup, not new design.
 
 ## Sources
 
+- [GitLab CI JSON schema (`ci.json`)](https://gitlab.com/gitlab-org/gitlab/-/raw/master/app/assets/javascripts/editor/schema/ci.json)
 - [GitLab: where variables can be used](https://docs.gitlab.com/ci/variables/where_variables_can_be_used/)
 - [GitLab epic 7437: allow default value for variables](https://gitlab.com/groups/gitlab-org/-/epics/7437)
 - [Docker forum: registry v2 spec and repository naming rule](https://forums.docker.com/t/docker-registry-v2-spec-and-repository-naming-rule/5466)

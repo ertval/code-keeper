@@ -24,7 +24,7 @@ billing-app:build:package:
   - python3 -m compileall -b .
     # Artifact paths are resolved from the project root, not from the service
     # directory, so they are declared service-relative and verified to exist.
-  - test -f requirements.txt || { echo "ERROR: declared artifact requirements.txt not found in ${APP_DIR}"; exit 1; }
+  - 'test -f requirements.txt || { echo "ERROR: declared artifact requirements.txt not found in ${APP_DIR}"; exit 1; }'
   artifacts:
     paths:
     - srcs/billing-app/requirements.txt
@@ -65,6 +65,7 @@ billing-app:test:unit:
       - srcs/billing-app/**/*
     when: on_success
   - when: never
+  before_script:
   - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
   - cd "${APP_DIR}"
   - pwd
@@ -109,6 +110,7 @@ billing-app:scan:sast_bandit:
       - srcs/billing-app/**/*
     when: on_success
   - when: never
+  before_script:
   - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
   - cd "${APP_DIR}"
   - pwd
@@ -269,6 +271,7 @@ billing-app:scan:dependencies:
   - if: $CI_COMMIT_BRANCH
     when: on_success
   - when: never
+  before_script:
   - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
   - cd "${APP_DIR}"
   - pwd
@@ -331,10 +334,10 @@ billing-app:containerize:docker:
     # both the context and the Dockerfile must live in the same service directory. The
     # fail-fast checks make a wrong path an error instead of a silent cross-service build.
   - SERVICE_DIR="${CI_PROJECT_DIR}/${APP_DIR}"
-  - test -d "${SERVICE_DIR}" || { echo "ERROR: service directory ${SERVICE_DIR} does not exist"; exit 1; }
-  - test -f "${SERVICE_DIR}/Dockerfile" || { echo "ERROR: no Dockerfile at ${SERVICE_DIR}/Dockerfile"; exit 1; }
-  - test -f "${SERVICE_DIR}/requirements.txt" || { echo "ERROR: no requirements.txt at ${SERVICE_DIR}/requirements.txt"; exit 1; }
-  - echo "Build context ${SERVICE_DIR} (Dockerfile: Dockerfile, context-relative)"
+  - 'test -d "${SERVICE_DIR}" || { echo "ERROR: service directory ${SERVICE_DIR} does not exist"; exit 1; }'
+  - 'test -f "${SERVICE_DIR}/Dockerfile" || { echo "ERROR: no Dockerfile at ${SERVICE_DIR}/Dockerfile"; exit 1; }'
+  - 'test -f "${SERVICE_DIR}/requirements.txt" || { echo "ERROR: no requirements.txt at ${SERVICE_DIR}/requirements.txt"; exit 1; }'
+  - 'echo "Build context ${SERVICE_DIR} (Dockerfile: Dockerfile, context-relative)"'
   - /kaniko/executor --context "${SERVICE_DIR}" --dockerfile "Dockerfile" --destination "${IMAGE_TAG}" --cache=false
   - echo "=== [Containerization] Pushed immutable image ${IMAGE_TAG} ==="
   - echo "Release aliases are promoted by the CD stages, not by this job."
@@ -411,15 +414,15 @@ billing-app:deploy:staging:
     if ! printf '%s' "${DOCKERHUB_TOKEN}" | crane auth login "index.docker.io" -u "${DOCKERHUB_USERNAME}" --password-stdin >/dev/null 2>&1; then
       echo "ERROR: cannot authenticate to Docker Hub; refusing to mutate ${TASK_FAMILY}"; exit 1
     fi
-  - crane digest "${TARGET_IMAGE}" >/dev/null 2>&1 || { echo "ERROR: ${TARGET_IMAGE} is not in the registry (was it built on this commit?); refusing to point ${TASK_FAMILY} at a missing image"; exit 1; }
+  - 'crane digest "${TARGET_IMAGE}" >/dev/null 2>&1 || { echo "ERROR: ${TARGET_IMAGE} is not in the registry (was it built on this commit?); refusing to point ${TASK_FAMILY} at a missing image"; exit 1; }'
   - echo "=== [CD] Verifying ${TARGET_IMAGE} exists in the registry before touching the task definition ==="
 
   - echo "=== [CD] Describing the running task definition of ${APP_NAME} ==="
   - aws ecs describe-task-definition --task-definition "${TASK_FAMILY}" --region "${AWS_DEFAULT_REGION:-us-east-1}" --query taskDefinition --output json > taskdef.json
   - CURRENT_IMAGE=$(jq -r --arg container "${APP_NAME}" '.containerDefinitions[] | select(.name == $container) | .image' taskdef.json)
-  - test -n "${CURRENT_IMAGE}" || { echo "ERROR: no container named ${APP_NAME} in task definition ${TASK_FAMILY}"; exit 1; }
-  - echo "Running image: ${CURRENT_IMAGE}"
-  - echo "Promoting to: ${TARGET_IMAGE}"
+  - 'test -n "${CURRENT_IMAGE}" || { echo "ERROR: no container named ${APP_NAME} in task definition ${TASK_FAMILY}"; exit 1; }'
+  - 'echo "Running image: ${CURRENT_IMAGE}"'
+  - 'echo "Promoting to: ${TARGET_IMAGE}"'
   - |
     if [ "${CURRENT_IMAGE}" = "${TARGET_IMAGE}" ]; then
       echo "Task definition ${TASK_FAMILY} already runs ${TARGET_IMAGE}, nothing to promote."
@@ -450,9 +453,9 @@ billing-app:approval:production:
   script:
   - echo "============================================================"
   - echo " Stakeholder Approval Confirmed for Production Deployment"
-  - echo " Application: ${APP_NAME}"
-  - echo " Release Tag: ${IMAGE_TAG}"
-  - echo " Authorized by: ${GITLAB_USER_NAME} (${GITLAB_USER_EMAIL})"
+  - 'echo " Application: ${APP_NAME}"'
+  - 'echo " Release Tag: ${IMAGE_TAG}"'
+  - 'echo " Authorized by: ${GITLAB_USER_NAME} (${GITLAB_USER_EMAIL})"'
   - echo "============================================================"
 
 # ------------------------------------------------------------------------------
@@ -503,10 +506,10 @@ billing-app:promote:image:
   script:
   - echo "=== [CD] Promoting ${IMAGE_TAG} to the ${IMAGE_PROD} release alias ==="
   - crane copy "${IMAGE_TAG}" "${IMAGE_PROD}"
-  - SHA_DIGEST=$(crane digest "${IMAGE_TAG}") || { echo "ERROR: cannot resolve ${IMAGE_TAG}"; exit 1; }
-  - ALIAS_DIGEST=$(crane digest "${IMAGE_PROD}") || { echo "ERROR: cannot resolve ${IMAGE_PROD}"; exit 1; }
-  - test -n "${SHA_DIGEST}" || { echo "ERROR: empty digest for ${IMAGE_TAG}"; exit 1; }
-  - test "${SHA_DIGEST}" = "${ALIAS_DIGEST}" || { echo "ERROR: ${IMAGE_PROD} resolves to ${ALIAS_DIGEST} but ${IMAGE_TAG} is ${SHA_DIGEST}"; exit 1; }
+  - 'SHA_DIGEST=$(crane digest "${IMAGE_TAG}") || { echo "ERROR: cannot resolve ${IMAGE_TAG}"; exit 1; }'
+  - 'ALIAS_DIGEST=$(crane digest "${IMAGE_PROD}") || { echo "ERROR: cannot resolve ${IMAGE_PROD}"; exit 1; }'
+  - 'test -n "${SHA_DIGEST}" || { echo "ERROR: empty digest for ${IMAGE_TAG}"; exit 1; }'
+  - 'test "${SHA_DIGEST}" = "${ALIAS_DIGEST}" || { echo "ERROR: ${IMAGE_PROD} resolves to ${ALIAS_DIGEST} but ${IMAGE_TAG} is ${SHA_DIGEST}"; exit 1; }'
   - echo "=== [CD] ${IMAGE_PROD} -> ${ALIAS_DIGEST} (promoted from ${IMAGE_TAG}) ==="
 
 billing-app:deploy:production:
@@ -550,9 +553,9 @@ billing-app:deploy:production:
   - echo "=== [CD] Describing the running task definition of ${APP_NAME} ==="
   - aws ecs describe-task-definition --task-definition "${TASK_FAMILY}" --region "${AWS_DEFAULT_REGION:-us-east-1}" --query taskDefinition --output json > taskdef.json
   - CURRENT_IMAGE=$(jq -r --arg container "${APP_NAME}" '.containerDefinitions[] | select(.name == $container) | .image' taskdef.json)
-  - test -n "${CURRENT_IMAGE}" || { echo "ERROR: no container named ${APP_NAME} in task definition ${TASK_FAMILY}"; exit 1; }
-  - echo "Running image: ${CURRENT_IMAGE}"
-  - echo "Promoting to: ${TARGET_IMAGE}"
+  - 'test -n "${CURRENT_IMAGE}" || { echo "ERROR: no container named ${APP_NAME} in task definition ${TASK_FAMILY}"; exit 1; }'
+  - 'echo "Running image: ${CURRENT_IMAGE}"'
+  - 'echo "Promoting to: ${TARGET_IMAGE}"'
   - |
     if [ "${CURRENT_IMAGE}" = "${TARGET_IMAGE}" ]; then
       echo "Task definition ${TASK_FAMILY} already runs ${TARGET_IMAGE}, nothing to promote."

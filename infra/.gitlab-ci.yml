@@ -30,9 +30,9 @@ infra:init:staging:
   - when: never
   script:
   - cd infra/environments/staging
-  - test -n "${TF_STATE_BUCKET:-}" || { echo "ERROR: TF_STATE_BUCKET CI protected variable is unset"; exit 1; }
-  - test -n "${TF_STATE_REGION:-}" || { echo "ERROR: TF_STATE_REGION CI protected variable is unset"; exit 1; }
-  - test -n "${TF_STATE_LOCK_TABLE:-}" || { echo "ERROR: TF_STATE_LOCK_TABLE CI protected variable is unset"; exit 1; }
+  - 'test -n "${TF_STATE_BUCKET:-}" || { echo "ERROR: TF_STATE_BUCKET CI protected variable is unset"; exit 1; }'
+  - 'test -n "${TF_STATE_REGION:-}" || { echo "ERROR: TF_STATE_REGION CI protected variable is unset"; exit 1; }'
+  - 'test -n "${TF_STATE_LOCK_TABLE:-}" || { echo "ERROR: TF_STATE_LOCK_TABLE CI protected variable is unset"; exit 1; }'
   - >-
     terraform init -input=false
     -backend-config=backend.hcl
@@ -79,9 +79,9 @@ infra:init:production:
   - when: never
   script:
   - cd infra/environments/production
-  - test -n "${TF_STATE_BUCKET:-}" || { echo "ERROR: TF_STATE_BUCKET CI protected variable is unset"; exit 1; }
-  - test -n "${TF_STATE_REGION:-}" || { echo "ERROR: TF_STATE_REGION CI protected variable is unset"; exit 1; }
-  - test -n "${TF_STATE_LOCK_TABLE:-}" || { echo "ERROR: TF_STATE_LOCK_TABLE CI protected variable is unset"; exit 1; }
+  - 'test -n "${TF_STATE_BUCKET:-}" || { echo "ERROR: TF_STATE_BUCKET CI protected variable is unset"; exit 1; }'
+  - 'test -n "${TF_STATE_REGION:-}" || { echo "ERROR: TF_STATE_REGION CI protected variable is unset"; exit 1; }'
+  - 'test -n "${TF_STATE_LOCK_TABLE:-}" || { echo "ERROR: TF_STATE_LOCK_TABLE CI protected variable is unset"; exit 1; }'
   - >-
     terraform init -input=false
     -backend-config=backend.hcl
@@ -213,9 +213,9 @@ infra:plan:staging:
   - when: never
   script:
   - cd infra/environments/staging
-  - test -n "${TF_VAR_inventory_db_password:-}" || { echo "ERROR: TF_VAR_inventory_db_password CI masked var is unset"; exit 1; }
-  - test -n "${TF_VAR_billing_db_password:-}" || { echo "ERROR: TF_VAR_billing_db_password CI masked var is unset"; exit 1; }
-  - test -n "${TF_VAR_rabbitmq_password:-}" || { echo "ERROR: TF_VAR_rabbitmq_password CI masked var is unset"; exit 1; }
+  - 'test -n "${TF_VAR_inventory_db_password:-}" || { echo "ERROR: TF_VAR_inventory_db_password CI masked var is unset"; exit 1; }'
+  - 'test -n "${TF_VAR_billing_db_password:-}" || { echo "ERROR: TF_VAR_billing_db_password CI masked var is unset"; exit 1; }'
+  - 'test -n "${TF_VAR_rabbitmq_password:-}" || { echo "ERROR: TF_VAR_rabbitmq_password CI masked var is unset"; exit 1; }'
   - terraform plan -input=false -out=staging.tfplan
   artifacts:
     name: "staging-tfplan-${CI_COMMIT_SHORT_SHA}"
@@ -252,9 +252,9 @@ infra:plan:production:
   - when: never
   script:
   - cd infra/environments/production
-  - test -n "${TF_VAR_inventory_db_password:-}" || { echo "ERROR: TF_VAR_inventory_db_password CI masked var is unset"; exit 1; }
-  - test -n "${TF_VAR_billing_db_password:-}" || { echo "ERROR: TF_VAR_billing_db_password CI masked var is unset"; exit 1; }
-  - test -n "${TF_VAR_rabbitmq_password:-}" || { echo "ERROR: TF_VAR_rabbitmq_password CI masked var is unset"; exit 1; }
+  - 'test -n "${TF_VAR_inventory_db_password:-}" || { echo "ERROR: TF_VAR_inventory_db_password CI masked var is unset"; exit 1; }'
+  - 'test -n "${TF_VAR_billing_db_password:-}" || { echo "ERROR: TF_VAR_billing_db_password CI masked var is unset"; exit 1; }'
+  - 'test -n "${TF_VAR_rabbitmq_password:-}" || { echo "ERROR: TF_VAR_rabbitmq_password CI masked var is unset"; exit 1; }'
   - terraform plan -input=false -out=production.tfplan
   artifacts:
     name: "production-tfplan-${CI_COMMIT_SHORT_SHA}"
@@ -303,13 +303,16 @@ infra:approval:production:
   - if: $CI_PIPELINE_SOURCE == "schedule"
     when: never
   - if: $CI_COMMIT_BRANCH == "main"
+    changes:
+      paths:
+      - infra/**/*
   when: manual
   allow_failure: false
   script:
   - echo "============================================================"
   - echo " Production Deployment Approval Granted by Operator"
   - echo " Authorizing promotion of changes from staging to production"
-  - echo " Commit: ${CI_COMMIT_SHA} by ${GITLAB_USER_NAME}"
+  - 'echo " Commit: ${CI_COMMIT_SHA} by ${GITLAB_USER_NAME}"'
   - echo "============================================================"
 
 # ------------------------------------------------------------------------------
@@ -326,7 +329,12 @@ infra:apply:production:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule"
     when: never
+  # Same changes: filter as infra:plan:production, so the plan this job needs
+  # and the production.tfplan it applies exist whenever the job does.
   - if: $CI_COMMIT_BRANCH == "main"
+    changes:
+      paths:
+      - infra/**/*
   needs:
   - infra:approval:production
   - infra:plan:production
