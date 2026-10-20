@@ -69,7 +69,7 @@ module "rabbitmq" {
   environment        = var.environment
   subnet_ids         = module.vpc.private_subnet_ids
   security_group_id  = module.security_groups.rabbitmq_security_group_id
-  host_instance_type = "mq.t3.micro"
+  host_instance_type = "mq.m7g.medium"
   deployment_mode    = "SINGLE_INSTANCE"
   admin_password     = var.rabbitmq_password
 }
@@ -100,8 +100,10 @@ module "compute" {
   billing_db_name                 = module.rds.billing_db_name
   # The broker's real hostname. It used to be the Terraform resource *name*,
   # which is not resolvable in DNS, so no client could ever connect.
-  rabbitmq_host     = module.rabbitmq.broker_host
-  rabbitmq_port     = module.rabbitmq.broker_port
-  rabbitmq_username = var.rabbitmq_username
-  rabbitmq_password = var.rabbitmq_password
+  rabbitmq_host      = module.rabbitmq.broker_host
+  rabbitmq_port      = module.rabbitmq.broker_port
+  rabbitmq_username  = var.rabbitmq_username
+  rabbitmq_password  = var.rabbitmq_password
+  dockerhub_username = var.dockerhub_username
+  dockerhub_token    = var.dockerhub_token
 }

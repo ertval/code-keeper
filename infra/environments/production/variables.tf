@@ -60,6 +60,17 @@ variable "rabbitmq_password" {
   sensitive   = true
 }
 
+variable "dockerhub_username" {
+  description = "Docker Hub user the ECS tasks pull the images as. In CI, TF_VAR_dockerhub_username is set from DOCKERHUB_USERNAME."
+  type        = string
+}
+
+variable "dockerhub_token" {
+  description = "Docker Hub access token for dockerhub_username. In CI, TF_VAR_dockerhub_token is set from the masked DOCKERHUB_TOKEN."
+  type        = string
+  sensitive   = true
+}
+
 variable "api_gateway_image" {
   description = "Full image reference for the API Gateway task; when null it is derived from image_repository_prefix and release_tag."
   type        = string

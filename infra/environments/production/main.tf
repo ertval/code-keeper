@@ -51,15 +51,19 @@ module "security_groups" {
   vpc_cidr    = var.cidr_block
 }
 
+# Production is sized like staging so both environments fit the AWS Free plan
+# credits. The high-availability sizes were: RDS db.t3.small with 50 GB, Multi-AZ
+# and 30-day backups; Amazon MQ mq.m5.large as CLUSTER_MULTI_AZ (on RabbitMQ 4.2
+# that needs an mq.m7g type); 4 replicas per service with 512 CPU units and 1024 MB.
 module "rds" {
   source                  = "../../modules/rds"
   environment             = var.environment
   database_subnet_ids     = module.vpc.database_subnet_ids
   security_group_id       = module.security_groups.database_security_group_id
-  instance_class          = "db.t3.small"
-  allocated_storage       = 50
-  multi_az                = true
-  backup_retention_period = 30
+  instance_class          = "db.t3.micro"
+  allocated_storage       = 20
+  multi_az                = false
+  backup_retention_period = 7
   inventory_db_password   = var.inventory_db_password
   billing_db_password     = var.billing_db_password
 }
@@ -69,8 +73,8 @@ module "rabbitmq" {
   environment        = var.environment
   subnet_ids         = module.vpc.private_subnet_ids
   security_group_id  = module.security_groups.rabbitmq_security_group_id
-  host_instance_type = "mq.m5.large"
-  deployment_mode    = "CLUSTER_MULTI_AZ"
+  host_instance_type = "mq.m7g.medium"
+  deployment_mode    = "SINGLE_INSTANCE"
   admin_password     = var.rabbitmq_password
 }
 
@@ -87,11 +91,9 @@ module "compute" {
   api_gateway_image               = local.api_gateway_image
   inventory_app_image             = local.inventory_app_image
   billing_app_image               = local.billing_app_image
-  gateway_replicas                = 4
-  inventory_replicas              = 4
-  billing_replicas                = 4
-  cpu                             = "512"
-  memory                          = "1024"
+  gateway_replicas                = 2
+  inventory_replicas              = 2
+  billing_replicas                = 2
   inventory_db_host               = module.rds.inventory_db_address
   inventory_db_username           = module.rds.inventory_db_username
   inventory_db_password           = var.inventory_db_password
@@ -102,8 +104,10 @@ module "compute" {
   billing_db_name                 = module.rds.billing_db_name
   # The broker's real hostname. It used to be the Terraform resource *name*,
   # which is not resolvable in DNS, so no client could ever connect.
-  rabbitmq_host     = module.rabbitmq.broker_host
-  rabbitmq_port     = module.rabbitmq.broker_port
-  rabbitmq_username = var.rabbitmq_username
-  rabbitmq_password = var.rabbitmq_password
+  rabbitmq_host      = module.rabbitmq.broker_host
+  rabbitmq_port      = module.rabbitmq.broker_port
+  rabbitmq_username  = var.rabbitmq_username
+  rabbitmq_password  = var.rabbitmq_password
+  dockerhub_username = var.dockerhub_username
+  dockerhub_token    = var.dockerhub_token
 }

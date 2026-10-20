@@ -578,6 +578,8 @@ inventory-app:promote:image:
   - echo "=== [CD] ${IMAGE_PROD} -> ${ALIAS_DIGEST} (promoted from ${IMAGE_TAG}) ==="
 
 inventory-app:deploy:production:
+  # When infra/ changed in the same push, production gets the app only after
+  # Terraform applied production, as in deploy:staging.
   stage: Deploy to Production
   image:
     name: amazon/aws-cli:latest
@@ -591,6 +593,9 @@ inventory-app:deploy:production:
   - inventory-app:promote:image
   - inventory-app:deploy:staging
   - job: inventory-app:containerize:docker
+    artifacts: false
+  - job: infra:apply:production
+    optional: true
     artifacts: false
   environment:
     name: production

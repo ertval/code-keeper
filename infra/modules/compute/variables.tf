@@ -151,3 +151,14 @@ variable "rabbitmq_host" {
   description = "RabbitMQ broker host"
   type        = string
 }
+
+variable "dockerhub_username" {
+  description = "Docker Hub user the ECS tasks pull the service images as."
+  type        = string
+}
+
+variable "dockerhub_token" {
+  description = "Docker Hub access token for dockerhub_username; read access is enough. Never defaulted; must come from a sensitive TF_VAR."
+  type        = string
+  sensitive   = true
+}

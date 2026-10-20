@@ -582,6 +582,8 @@ api-gateway:promote:image:
   - echo "=== [CD] ${IMAGE_PROD} -> ${ALIAS_DIGEST} (promoted from ${IMAGE_TAG}) ==="
 
 api-gateway:deploy:production:
+  # When infra/ changed in the same push, production gets the app only after
+  # Terraform applied production, as in deploy:staging.
   stage: Deploy to Production
   image:
     name: amazon/aws-cli:latest
@@ -595,6 +597,9 @@ api-gateway:deploy:production:
   - api-gateway:promote:image
   - api-gateway:deploy:staging
   - job: api-gateway:containerize:docker
+    artifacts: false
+  - job: infra:apply:production
+    optional: true
     artifacts: false
   environment:
     name: production

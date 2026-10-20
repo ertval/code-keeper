@@ -219,6 +219,8 @@ infra:plan:staging:
   - 'test -n "${TF_VAR_inventory_db_password:-}" || { echo "ERROR: TF_VAR_inventory_db_password CI masked var is unset"; exit 1; }'
   - 'test -n "${TF_VAR_billing_db_password:-}" || { echo "ERROR: TF_VAR_billing_db_password CI masked var is unset"; exit 1; }'
   - 'test -n "${TF_VAR_rabbitmq_password:-}" || { echo "ERROR: TF_VAR_rabbitmq_password CI masked var is unset"; exit 1; }'
+  - 'test -n "${TF_VAR_dockerhub_username:-}" || { echo "ERROR: DOCKERHUB_USERNAME CI variable is unset"; exit 1; }'
+  - 'test -n "${TF_VAR_dockerhub_token:-}" || { echo "ERROR: DOCKERHUB_TOKEN CI masked var is unset"; exit 1; }'
   - terraform plan -input=false -out=staging.tfplan
   artifacts:
     name: "staging-tfplan-${CI_COMMIT_SHORT_SHA}"
@@ -230,6 +232,10 @@ infra:plan:staging:
     DOCKERHUB_REPO: "grafido"
     TF_VAR_image_repository_prefix: docker.io/${DOCKERHUB_REPO}
     TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
+    # ECS pulls the service images as this Docker Hub user. A project-level
+    # TF_VAR_dockerhub_token (for example a read-only token) overrides it.
+    TF_VAR_dockerhub_username: ${DOCKERHUB_USERNAME}
+    TF_VAR_dockerhub_token: ${DOCKERHUB_TOKEN}
     TF_IN_AUTOMATION: "true"
     AWS_DEFAULT_REGION: "us-east-1"
   image: *id001
@@ -259,6 +265,8 @@ infra:plan:production:
   - 'test -n "${TF_VAR_inventory_db_password:-}" || { echo "ERROR: TF_VAR_inventory_db_password CI masked var is unset"; exit 1; }'
   - 'test -n "${TF_VAR_billing_db_password:-}" || { echo "ERROR: TF_VAR_billing_db_password CI masked var is unset"; exit 1; }'
   - 'test -n "${TF_VAR_rabbitmq_password:-}" || { echo "ERROR: TF_VAR_rabbitmq_password CI masked var is unset"; exit 1; }'
+  - 'test -n "${TF_VAR_dockerhub_username:-}" || { echo "ERROR: DOCKERHUB_USERNAME CI variable is unset"; exit 1; }'
+  - 'test -n "${TF_VAR_dockerhub_token:-}" || { echo "ERROR: DOCKERHUB_TOKEN CI masked var is unset"; exit 1; }'
   - terraform plan -input=false -out=production.tfplan
   artifacts:
     name: "production-tfplan-${CI_COMMIT_SHORT_SHA}"
@@ -273,6 +281,10 @@ infra:plan:production:
     DOCKERHUB_REPO: "grafido"
     TF_VAR_image_repository_prefix: docker.io/${DOCKERHUB_REPO}
     TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
+    # ECS pulls the service images as this Docker Hub user. A project-level
+    # TF_VAR_dockerhub_token (for example a read-only token) overrides it.
+    TF_VAR_dockerhub_username: ${DOCKERHUB_USERNAME}
+    TF_VAR_dockerhub_token: ${DOCKERHUB_TOKEN}
     TF_IN_AUTOMATION: "true"
     AWS_DEFAULT_REGION: "us-east-1"
   image: *id001

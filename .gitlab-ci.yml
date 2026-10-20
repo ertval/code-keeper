@@ -54,8 +54,10 @@ stages:
   - Deploy to Staging
   # shared gates
   - Approval
-  - Deploy to Production
+  # Infra before apps, so an app deploy:production can wait for
+  # infra:apply:production (needs: only reach the same or an earlier stage).
   - Apply to Production
+  - Deploy to Production
 
 # One workflow for the whole pipeline. Previously each of the four files carried
 # its own identical copy, where last-one-wins made the effective rules depend on

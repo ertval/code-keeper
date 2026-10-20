@@ -8,10 +8,13 @@ terraform {
   }
 }
 
+# Amazon MQ offers only RabbitMQ 3.13, 4.2 and 4.3 for new brokers (3.11 is gone),
+# and only as major.minor with auto_minor_version_upgrade on. The apps use one
+# durable queue and a per-consumer prefetch, which RabbitMQ 4 still supports.
 resource "aws_mq_broker" "rabbitmq" {
   broker_name                = "code-keeper-${var.environment}-rabbitmq"
   engine_type                = "RabbitMQ"
-  engine_version             = "3.11.20"
+  engine_version             = "4.2"
   host_instance_type         = var.host_instance_type
   deployment_mode            = var.deployment_mode
   publicly_accessible        = false

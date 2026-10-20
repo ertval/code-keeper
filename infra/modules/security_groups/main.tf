@@ -15,8 +15,9 @@ terraform {
 # port plus the VPC CIDR. Referencing a peer security group from egress while
 # that peer references this one from ingress would build a dependency cycle.
 locals {
-  # AmazonProvidedDNS resolver address of the VPC (network address + 2).
-  vpc_resolver = cidrhost(var.vpc_cidr, 2)
+  # AmazonProvidedDNS resolver address of the VPC (network address + 2), as a /32:
+  # cidr_blocks needs CIDR notation, and a bare address fails at plan time.
+  vpc_resolver = "${cidrhost(var.vpc_cidr, 2)}/32"
 
   # Instance metadata service, required by the RabbitMQ broker nodes.
   imds_address = "169.254.169.254/32"

@@ -239,3 +239,56 @@ named it; `requests` 2.34.2 is the current release and clears PYSEC-2026-2275.
 - api-gateway `test:unit` (7 passed) and `scan:dependencies` ("No known vulnerabilities found")
   run locally in `python:3.11-alpine` with `requests` 2.34.2.
 - Not run: `terraform plan`/`apply` (needs AWS).
+
+## 2026-10-20 18:59 EEST: AWS setup guide
+
+**What**
+- `AWS_SETUP.md`: new file in the project root. Step-by-step AWS setup for the current Terraform and
+  CI: cost estimate, account basics, CLI profile, pre-flight checks (RDS and RabbitMQ engine
+  versions, Fargate quota), S3 state bucket and DynamoDB lock table, CI IAM user, Docker Hub
+  repositories and token, password generation, the GitLab CI/CD variables table, the first pipeline
+  run order, checks, teardown, and the open code changes before the first apply.
+
+**Why**
+The user asked for the AWS step-by-step guidelines as a Markdown file. It goes in the project root
+because the `docs/` folder is read-only for Claude.
+
+## 2026-10-20 19:41 EEST: Cheapest AWS sizes, current engine versions, Docker Hub pull login, production waits for infra
+
+**What**
+- `infra/modules/rds/main.tf`: `engine_version` `15.4` → `15` for both databases (15.4 is no longer
+  offered; RDS now picks the current 15.x release).
+- `infra/modules/rabbitmq/main.tf`, `variables.tf`: RabbitMQ `3.11.20` → `4.2`; default broker type
+  `mq.t3.micro` → `mq.m7g.medium` (mq.t3.micro is no longer offered for RabbitMQ).
+- `infra/environments/staging/main.tf`: broker `mq.m7g.medium`.
+- `infra/environments/production/main.tf`: sized like staging (db.t3.micro, 20 GB, single-AZ,
+  7-day backups; single-instance mq.m7g.medium; 2 tasks per service at the default 256/512), with
+  a comment listing the previous high-availability sizes.
+- `infra/modules/compute/main.tf`, `variables.tf`, `infra/environments/*/main.tf`, `variables.tf`: a
+  fourth Secrets Manager secret `dockerhub-credentials` and `repositoryCredentials` on all three
+  containers, so ECS pulls the images as the Docker Hub user. New variables `dockerhub_username`
+  and `dockerhub_token`.
+- `infra/.gitlab-ci.yml`: both plan jobs set `TF_VAR_dockerhub_username`/`TF_VAR_dockerhub_token`
+  from `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` and check they are set.
+- `infra/modules/security_groups/main.tf`: the VPC resolver rule is now `<address>/32`; the bare
+  address made every plan fail.
+- `.gitlab-ci.yml`: "Apply to Production" now comes before "Deploy to Production".
+- `srcs/*/.gitlab-ci.yml`: each `deploy:production` has an optional need on
+  `infra:apply:production`.
+
+**Why**
+The account is on the AWS Free plan ($73.06 credits left), and the user asked for the cheapest
+option and for all AWS resources to be removed after testing. The step 3 checks showed that the
+pinned RDS and RabbitMQ versions and the staging broker type are no longer offered. The pull login
+avoids Docker Hub's per-IP limit on anonymous pulls through the NAT IP. The earlier `AWS_SETUP.md`
+entry is outdated in one detail: the user moved the file to `docs/AWS_SETUP.md`, which is read-only
+for Claude, so its update was handed to the user as a patch.
+
+**Verified**
+- `terraform fmt -check` OK; `terraform validate` OK for staging and production.
+- `terraform plan` against the AWS account with a local backend and placeholder secrets: 62 to add
+  for each environment, after the CIDR fix (before it, both plans failed). Nothing was created.
+- `trivy config --severity HIGH,CRITICAL` on `infra/`: exit 0.
+- GitLab 19.5 CI Lint on the merged config: valid. Rules simulator: 9 of 9 scenarios OK.
+  `pipeline:lint` run locally: all 75 `needs:` resolve. `scripts/test_pipelines.sh` on a copy: 91
+  passed, 0 failed.

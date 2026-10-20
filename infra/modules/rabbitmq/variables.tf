@@ -14,9 +14,9 @@ variable "security_group_id" {
 }
 
 variable "host_instance_type" {
-  description = "Instance type for RabbitMQ broker"
+  description = "Instance type for RabbitMQ broker. mq.m7g.medium is the smallest type Amazon MQ offers for RabbitMQ 4.x (mq.t3.micro is no longer offered)."
   type        = string
-  default     = "mq.t3.micro"
+  default     = "mq.m7g.medium"
 }
 
 variable "deployment_mode" {

@@ -124,17 +124,20 @@ resource "aws_iam_role_policy_attachment" "ecs_execution_policy" {
 # ECS agent resolves when a task starts. They no longer appear in the task
 # definitions (Trivy AWS-0036) or in `aws ecs describe-task-definition` output.
 # name_prefix keeps a destroy and re-create from colliding with a secret that is
-# still inside its recovery window.
+# still inside its recovery window. The Docker Hub login lets ECS pull the images
+# as an authenticated user: anonymous pulls all leave through the one NAT IP and
+# Docker Hub rate-limits them per IP.
 locals {
   task_secret_values = {
     "inventory-db-password" = var.inventory_db_password
     "billing-db-password"   = var.billing_db_password
     "rabbitmq-password"     = var.rabbitmq_password
+    "dockerhub-credentials" = jsonencode({ username = var.dockerhub_username, password = var.dockerhub_token })
   }
 }
 
 resource "aws_secretsmanager_secret" "task" {
-  for_each    = toset(["inventory-db-password", "billing-db-password", "rabbitmq-password"])
+  for_each    = toset(["inventory-db-password", "billing-db-password", "rabbitmq-password", "dockerhub-credentials"])
   name_prefix = "code-keeper-${var.environment}-${each.key}-"
   description = "code-keeper ${var.environment} ${each.key}, read by the ECS tasks at start-up"
 }
@@ -188,9 +191,10 @@ resource "aws_ecs_task_definition" "api_gateway" {
 
   container_definitions = jsonencode([
     {
-      name      = "api-gateway"
-      image     = var.api_gateway_image
-      essential = true
+      name                  = "api-gateway"
+      image                 = var.api_gateway_image
+      repositoryCredentials = { credentialsParameter = aws_secretsmanager_secret.task["dockerhub-credentials"].arn }
+      essential             = true
       portMappings = [
         {
           containerPort = 3000
@@ -267,9 +271,10 @@ resource "aws_ecs_task_definition" "inventory_app" {
 
   container_definitions = jsonencode([
     {
-      name      = "inventory-app"
-      image     = var.inventory_app_image
-      essential = true
+      name                  = "inventory-app"
+      image                 = var.inventory_app_image
+      repositoryCredentials = { credentialsParameter = aws_secretsmanager_secret.task["dockerhub-credentials"].arn }
+      essential             = true
       portMappings = [
         {
           containerPort = 8080
@@ -352,9 +357,10 @@ resource "aws_ecs_task_definition" "billing_app" {
 
   container_definitions = jsonencode([
     {
-      name      = "billing-app"
-      image     = var.billing_app_image
-      essential = true
+      name                  = "billing-app"
+      image                 = var.billing_app_image
+      repositoryCredentials = { credentialsParameter = aws_secretsmanager_secret.task["dockerhub-credentials"].arn }
+      essential             = true
       portMappings = [
         {
           containerPort = 8080

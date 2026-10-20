@@ -78,12 +78,16 @@ resource "aws_db_subnet_group" "db_subnet" {
   }
 }
 
+# engine_version is the major version only. RDS picks the current 15.x release at
+# create time and auto_minor_version_upgrade keeps it current without plan diffs;
+# a pinned minor (it was 15.4) stops being offered for new instances.
+
 # Inventory Database (movies)
 resource "aws_db_instance" "inventory_db" {
   identifier              = "code-keeper-${var.environment}-inventory-db"
   allocated_storage       = var.allocated_storage
   engine                  = "postgres"
-  engine_version          = "15.4"
+  engine_version          = "15"
   instance_class          = var.instance_class
   db_name                 = var.inventory_db_name
   username                = var.inventory_db_username
@@ -111,7 +115,7 @@ resource "aws_db_instance" "billing_db" {
   identifier              = "code-keeper-${var.environment}-billing-db"
   allocated_storage       = var.allocated_storage
   engine                  = "postgres"
-  engine_version          = "15.4"
+  engine_version          = "15"
   instance_class          = var.instance_class
   db_name                 = var.billing_db_name
   username                = var.billing_db_username
