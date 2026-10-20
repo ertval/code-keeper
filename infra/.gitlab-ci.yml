@@ -1,3 +1,7 @@
+# Both Init jobs save to this one key, and each job's archive holds only its own
+# environment's .terraform, so the last job to finish replaces the other's. The
+# cache only saves download time: every job that runs Terraform in an environment
+# runs `terraform init` there first.
 cache:
   key: "${CI_COMMIT_REF_SLUG}-terraform"
   paths:
@@ -128,8 +132,8 @@ infra:validate:syntax:
   script:
   - cd infra
   - terraform fmt -check -recursive
-  - cd environments/staging && terraform validate
-  - cd ../production && terraform validate
+  - cd environments/staging && terraform init -backend=false -input=false && terraform validate
+  - cd ../production && terraform init -backend=false -input=false && terraform validate
 
   variables:
     DOCKERHUB_REPO: "grafido"
@@ -221,6 +225,12 @@ infra:plan:staging:
   - 'test -n "${TF_VAR_rabbitmq_password:-}" || { echo "ERROR: TF_VAR_rabbitmq_password CI masked var is unset"; exit 1; }'
   - 'test -n "${TF_VAR_dockerhub_username:-}" || { echo "ERROR: DOCKERHUB_USERNAME CI variable is unset"; exit 1; }'
   - 'test -n "${TF_VAR_dockerhub_token:-}" || { echo "ERROR: DOCKERHUB_TOKEN CI masked var is unset"; exit 1; }'
+  - >-
+    terraform init -input=false
+    -backend-config=backend.hcl
+    -backend-config="bucket=${TF_STATE_BUCKET}"
+    -backend-config="region=${TF_STATE_REGION}"
+    -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}"
   - terraform plan -input=false -out=staging.tfplan
   artifacts:
     name: "staging-tfplan-${CI_COMMIT_SHORT_SHA}"
@@ -267,6 +277,12 @@ infra:plan:production:
   - 'test -n "${TF_VAR_rabbitmq_password:-}" || { echo "ERROR: TF_VAR_rabbitmq_password CI masked var is unset"; exit 1; }'
   - 'test -n "${TF_VAR_dockerhub_username:-}" || { echo "ERROR: DOCKERHUB_USERNAME CI variable is unset"; exit 1; }'
   - 'test -n "${TF_VAR_dockerhub_token:-}" || { echo "ERROR: DOCKERHUB_TOKEN CI masked var is unset"; exit 1; }'
+  - >-
+    terraform init -input=false
+    -backend-config=backend.hcl
+    -backend-config="bucket=${TF_STATE_BUCKET}"
+    -backend-config="region=${TF_STATE_REGION}"
+    -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}"
   - terraform plan -input=false -out=production.tfplan
   artifacts:
     name: "production-tfplan-${CI_COMMIT_SHORT_SHA}"
@@ -303,6 +319,12 @@ infra:apply:staging:
       - infra/**/*
   script:
   - cd infra/environments/staging
+  - >-
+    terraform init -input=false
+    -backend-config=backend.hcl
+    -backend-config="bucket=${TF_STATE_BUCKET}"
+    -backend-config="region=${TF_STATE_REGION}"
+    -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}"
   - terraform apply -input=false -auto-approve staging.tfplan
   environment:
     name: staging
@@ -367,6 +389,12 @@ infra:apply:production:
   - infra:plan:production
   script:
   - cd infra/environments/production
+  - >-
+    terraform init -input=false
+    -backend-config=backend.hcl
+    -backend-config="bucket=${TF_STATE_BUCKET}"
+    -backend-config="region=${TF_STATE_REGION}"
+    -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}"
   - terraform apply -input=false -auto-approve production.tfplan
   environment:
     name: production

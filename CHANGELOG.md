@@ -384,3 +384,34 @@ submission.
 - Docker Hub `sntentop` has 3 public repositories.
 - Found an untracked, not ignored `env.example` in the repo root that holds the Docker Hub token.
   The user was told to revoke that token and delete the file.
+
+## 2026-10-21 01:14 EEST: Every Terraform job runs terraform init itself
+
+**What**
+- `infra/.gitlab-ci.yml`:
+  - `infra:validate:syntax` runs `terraform init -backend=false` in each environment before
+    `terraform validate`.
+  - `infra:plan:staging`, `infra:plan:production`, `infra:apply:staging` and
+    `infra:apply:production` run the same `terraform init` with the S3 backend as the Init jobs
+    before they plan or apply.
+  - A comment above the shared `cache:` explains why the cache cannot be relied on.
+
+**Why**
+Pipeline 10 (`main`, `a8691d8`) was the first in which `infra:init` passed. Its
+`infra:validate:syntax` then failed with "Module not installed" for staging. Both Init jobs save
+to the same cache key, and each archive holds only its own environment's `.terraform`, so the
+production job, which finished last, replaced staging's. The plan and apply jobs never ran
+`terraform init` either, although the Init job's comment said they did. They would have failed
+the same way. With validate failed, nothing in pipeline 10 reached AWS, and its production
+approvals can never open.
+
+**Verified**
+- GitLab 19.5.0 CI Lint on the merged config: valid, 0 errors and 0 warnings. The rules
+  simulator passes all scenarios. `scripts/test_pipelines.sh` on a copy: all tests passed.
+- The new job scripts, run in `hashicorp/terraform:1.6` in fresh checkouts with no
+  `.terraform`, against the real S3 backend, with placeholder secrets:
+  - validate passes for both environments
+  - plan gives 62 to add per environment
+  - a second fresh checkout reads the restored plan after `terraform init`, as an apply job
+    would, using `terraform show` instead of `apply`
+- The state bucket and lock table were empty afterwards. Nothing was applied.
