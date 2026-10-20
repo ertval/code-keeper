@@ -1,7 +1,8 @@
 # AWS Setup Guide
 
 Step-by-step setup of everything the code-keeper Terraform and CI pipelines need in AWS. Based on
-commit `c62effa`; names, region and variables come from `infra/` and the `.gitlab-ci.yml` files.
+the code as of 2026-10-20, after the cheapest-sizing changes; names, region and variables come from
+`infra/` and the `.gitlab-ci.yml` files.
 
 **Region:** everything is in `us-east-1`. It is fixed in `terraform.tfvars`, the availability zones
 and the ECS log configuration.
@@ -13,26 +14,35 @@ and the ECS log configuration.
 - an ECS Fargate cluster with the 3 services and private DNS (Cloud Map) between them
 - 2 PostgreSQL RDS instances (inventory and billing)
 - an Amazon MQ RabbitMQ broker
-- a KMS key, 3 Secrets Manager secrets, IAM roles and CloudWatch log groups
+- a KMS key, 4 Secrets Manager secrets (3 passwords and the Docker Hub pull login), IAM roles and
+  CloudWatch log groups
 
 ---
 
 ## Step 0. Know the cost first
 
-Rough monthly cost if everything runs 24/7. These are estimates from us-east-1 list prices; confirm
-them with the AWS Pricing Calculator.
+The account is on the AWS Free plan, so everything is paid from its credits. Check what is left
+with:
 
-| | Staging | Production (as configured) |
+```bash
+aws freetier get-account-plan-state --query accountPlanRemainingCredits
+```
+
+Both environments use the cheapest sizes that work, so they cost the same. Prices are us-east-1
+list prices from the AWS Pricing API (2026-10-20):
+
+| Per environment | Size | Per hour |
 |---|---|---|
-| Fargate tasks | 6 small, about $55 | 12 larger, about $215 |
-| RDS (2 instances) | t3.micro, about $30 | t3.small Multi-AZ, about $130 |
-| Amazon MQ | mq.t3.micro, about $20 | 3-node mq.m5.large cluster, about $630 |
-| NAT, ALB, public IPs | about $60 | about $60 |
-| **Total** | **about $170/month** | **about $1,000/month** |
+| Amazon MQ | 1 x mq.m7g.medium (the smallest RabbitMQ type), plus storage | about $0.14 to $0.17 |
+| Fargate | 6 tasks of 0.25 vCPU / 0.5 GB | about $0.07 |
+| RDS | 2 x db.t3.micro, 20 GB, single-AZ | about $0.04 |
+| NAT gateway, ALB, 3 public IPv4 addresses | | about $0.09 |
+| KMS, Secrets Manager, CloudWatch | | about $0.01 |
+| **Total** | | **about $0.35 to $0.38** |
 
-Production costs about $1.40 an hour, mostly because of the RabbitMQ cluster. Bring staging up
-first, bring production up close to the audit, and destroy it afterwards (step 11). See "Open code
-changes" at the end for a smaller production option.
+Both environments together cost about $0.75 an hour, or about $18 a day. With $73 of credits that
+is about 4 days of both running nonstop, so bring them up only to test and for the audit, and
+destroy them right after (steps 11 and 12).
 
 ---
 
@@ -41,7 +51,7 @@ changes" at the end for a smaller production option.
 1. Create the AWS account, or use one that is only for this project.
 2. Turn on MFA for the root user, and do not use root after this step.
 3. Create a budget: Billing → Budgets → "Monthly cost budget", with an email alert (for example at
-   $50).
+   $20).
 4. Create an admin IAM user for yourself (for example `<you>-admin`) with `AdministratorAccess` and
    MFA, and create an access key for it for the CLI.
 
@@ -64,15 +74,19 @@ aws rds describe-db-engine-versions --engine postgres --region us-east-1 \
   --query "DBEngineVersions[?starts_with(EngineVersion, '15.')].EngineVersion" --output text
 aws mq describe-broker-engine-types --engine-type RABBITMQ --region us-east-1 \
   --query 'BrokerEngineTypes[].EngineVersions[].Name' --output text
+aws mq describe-broker-instance-options --engine-type RABBITMQ --region us-east-1 \
+  --query 'BrokerInstanceOptions[].[HostInstanceType,join(`,`,SupportedEngineVersions)]' --output table
 aws service-quotas list-service-quotas --service-code fargate --region us-east-1 \
   --query "Quotas[].[QuotaName,Value]" --output table
 ```
 
-- **Engine versions.** The code pins RDS PostgreSQL `15.4` (`infra/modules/rds/main.tf`) and
-  RabbitMQ `3.11.20` (`infra/modules/rabbitmq/main.tf`). If either is not in the lists, the first
-  apply fails, so the code must be updated to a listed version first.
-- **Fargate quota.** Both environments together need about 7.5 vCPU. New accounts sometimes start
-  lower; if so, request an increase in Service Quotas.
+Results on 2026-10-20, and what the code uses now:
+
+- **RDS PostgreSQL.** 15.7 to 15.19 are offered; 15.4 is not. The code sets `engine_version = "15"`,
+  so RDS picks the current 15.x release.
+- **RabbitMQ.** Only 3.13, 4.2 and 4.3 are offered; 3.11 is not. mq.t3.micro is no longer offered
+  for RabbitMQ, and the mq.m5 types only run 3.13. The code uses RabbitMQ 4.2 on mq.m7g.medium.
+- **Fargate quota.** 30 vCPU; both environments together need 3 vCPU.
 
 ---
 
@@ -123,9 +137,10 @@ and the `elasticloadbalancing:DescribeLoadBalancers` call the health checks use.
 ## Step 6. Docker Hub
 
 1. In the namespace the pipeline pushes to (`grafido` by default), create 3 **public**
-   repositories: `api-gateway`, `inventory-app` and `billing-app`. They must be public, because ECS
-   pulls without credentials (the task definitions have no registry login).
+   repositories: `api-gateway`, `inventory-app` and `billing-app`.
 2. Create an access token: Account settings → Personal access tokens, with Read & Write access.
+   The pipeline pushes with it, and ECS pulls with the same user and token (stored in Secrets
+   Manager), so pulls are not limited like anonymous pulls through the NAT IP.
 
 ---
 
@@ -136,7 +151,7 @@ openssl rand -hex 16    # run 3 times: inventory DB, billing DB, RabbitMQ
 ```
 
 Hex output meets the RDS rules, the Amazon MQ rules (at least 12 characters, no `,` `:` `=`) and
-GitLab's masking rules. Keep the passwords in a password manager; step 11 needs them again.
+GitLab's masking rules. Keep the passwords in a password manager.
 
 ---
 
@@ -160,6 +175,9 @@ set up. After the repo split, put them on the GitLab **group** so all four repos
 | `DOCKERHUB_TOKEN` | from step 6 | yes | yes |
 | `DOCKERHUB_REPO` | only if your namespace is not `grafido` | no | no |
 
+- **Docker Hub login for ECS:** no extra variables. The plan jobs pass `DOCKERHUB_USERNAME` and
+  `DOCKERHUB_TOKEN` to Terraform as `TF_VAR_dockerhub_username` and `TF_VAR_dockerhub_token`. To
+  give ECS a separate read-only token, add it as a masked `TF_VAR_dockerhub_token` variable.
 - **Environment scope:** leave it at "All". The plan jobs do not declare an environment, so
   variables scoped to staging or production would not reach them.
 - **Region:** do not set `AWS_DEFAULT_REGION`; the YAML already sets `us-east-1`.
@@ -171,8 +189,7 @@ set up. After the repo split, put them on the GitLab **group** so all four repos
 
 ## Step 9. The first run
 
-Infra only applies when a commit to `main` changes something under `infra/` (for example the engine
-version update from step 3).
+Infra only applies when a commit to `main` changes something under `infra/`.
 
 1. **Staging infra.** `infra:plan:*` runs, then `infra:apply:staging` runs by itself. Expect 15 to
    20 minutes, mostly RDS and MQ.
@@ -180,12 +197,11 @@ version update from step 3).
 3. **Staging deploy.** `deploy:staging` registers a new task definition and waits for the service
    to settle. For the gateway it also checks `http://<ALB DNS>/health`. Until the images exist, ECS
    logs some failed task starts; that is harmless.
-4. **Production infra.** Start `infra:approval:production` by hand, then let
-   `infra:apply:production` **finish** before the next step. The MQ cluster can take 20 to 30
-   minutes.
-5. **Production apps.** Only then run the three `approval:production` jobs, followed by
-   `promote:image` and `deploy:production`. The app production deploy does not wait for production
-   infra yet, so if it is approved too early it fails because the cluster does not exist.
+4. **Production infra.** Start `infra:approval:production` by hand; `infra:apply:production` then
+   runs. Expect another 15 to 20 minutes.
+5. **Production apps.** Run the three `approval:production` jobs; `promote:image` and
+   `deploy:production` follow. When infra changed in the same push, each `deploy:production` waits
+   for `infra:apply:production` to finish.
 
 ---
 
@@ -212,23 +228,41 @@ There is no destroy job in CI. From `infra/environments/<env>`, run:
 terraform init -backend-config=backend.hcl -backend-config="bucket=$BUCKET" \
   -backend-config="region=us-east-1" -backend-config="dynamodb_table=code-keeper-tf-locks"
 export TF_VAR_inventory_db_password=... TF_VAR_billing_db_password=... TF_VAR_rabbitmq_password=...
+export TF_VAR_dockerhub_username=... TF_VAR_dockerhub_token=...
 export TF_VAR_image_repository_prefix=docker.io/grafido
 terraform destroy
 ```
 
-Destroy production first. Keep the state bucket and lock table; they cost almost nothing.
+Destroy production first, then staging. Keep the state bucket and lock table; they cost almost
+nothing.
 
 ---
 
-## Open code changes before the first apply
+## Step 12. Check that nothing billable is left
 
-1. **Engine versions.** Update RDS and RabbitMQ to versions from the step 3 output.
-2. **Docker Hub login for ECS.** ECS pulls anonymously through each environment's single NAT IP,
-   and Docker Hub rate-limits anonymous pulls per IP. With 18 tasks, a few redeploys or crash loops
-   could hit the limit. A pull secret in Secrets Manager fixes this and allows private repos.
-3. **Production waits for infra.** Make the app `deploy:production` jobs wait for
-   `infra:apply:production`, as staging already does. This needs the "Apply to Production" stage to
-   move before "Deploy to Production".
-4. **Production size (a decision).** Keep the full configuration (about $1,000 a month while it
-   runs), or shrink it to a single mq.t3.micro broker and 2 tasks per service (about $200 a month),
-   at the cost of the high-availability setup.
+Every command should print nothing:
+
+```bash
+aws ec2 describe-nat-gateways --region us-east-1 --filter Name=state,Values=pending,available \
+  --query 'NatGateways[].NatGatewayId' --output text
+aws ec2 describe-addresses --region us-east-1 --query 'Addresses[].PublicIp' --output text
+aws elbv2 describe-load-balancers --region us-east-1 --query 'LoadBalancers[].LoadBalancerName' --output text
+aws rds describe-db-instances --region us-east-1 --query 'DBInstances[].DBInstanceIdentifier' --output text
+aws rds describe-db-snapshots --region us-east-1 --snapshot-type manual --query 'DBSnapshots[].DBSnapshotIdentifier' --output text
+aws mq list-brokers --region us-east-1 --query 'BrokerSummaries[].BrokerName' --output text
+aws ecs list-clusters --region us-east-1 --query 'clusterArns' --output text
+```
+
+---
+
+## Changes already made for AWS (2026-10-20)
+
+1. **Engine versions:** RDS PostgreSQL `15` and RabbitMQ `4.2` on mq.m7g.medium (step 3).
+2. **Cheapest sizes:** production is sized like staging: single-AZ db.t3.micro with 20 GB, a
+   single-instance broker and 2 small tasks per service. `infra/environments/production/main.tf`
+   lists the previous high-availability sizes.
+3. **Docker Hub login for ECS:** the tasks pull the images through a Secrets Manager login.
+4. **Production waits for infra:** "Apply to Production" now runs before "Deploy to Production",
+   and each app `deploy:production` waits for `infra:apply:production` when it is in the pipeline.
+5. **VPC DNS rule:** the security group rules for the VPC resolver used a bare address, which
+   failed at plan time; it is now a `/32` CIDR.
