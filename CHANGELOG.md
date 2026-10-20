@@ -292,3 +292,95 @@ for Claude, so its update was handed to the user as a patch.
 - GitLab 19.5 CI Lint on the merged config: valid. Rules simulator: 9 of 9 scenarios OK.
   `pipeline:lint` run locally: all 75 `needs:` resolve. `scripts/test_pipelines.sh` on a copy: 91
   passed, 0 failed.
+
+## 2026-10-20 20:13 EEST: AWS state backend created, state variables set, Results.md
+
+**What**
+- AWS (account REDACTED_AWS_ACCOUNT_ID, us-east-1): created S3 bucket `code-keeper-tfstate-REDACTED_AWS_ACCOUNT_ID`
+  (versioning on, AES256, public access blocked, tag `Project=code-keeper`) and DynamoDB table
+  `code-keeper-tf-locks` (on-demand, key `LockID`), as in step 4 of `docs/AWS_SETUP.md`.
+- Local test GitLab, project `root/code-keeper`: added protected CI variables `TF_STATE_BUCKET`,
+  `TF_STATE_REGION` and `TF_STATE_LOCK_TABLE`. Cancelled pipeline 8 by mistake (it was the only
+  pipeline testing the code commit) and retried it.
+- `Results.md`: filled the empty file with the results of the remaining setup steps, the steps left
+  for the user with exact commands, and what the project still lacks for the audit.
+
+**Why**
+The user asked to run the remaining AWS setup steps once the pipeline finished and to report what
+is missing in `Results.md`. Creating the CI access key and storing the passwords and keys in GitLab
+was blocked by Claude Code's safety check, so those steps are written up for the user instead.
+
+**Verified**
+- Pipeline 8 (`0cd87d1`): 22 passed; both `infra:init` jobs failed only on the unset (protected)
+  state variable, as expected on a branch.
+- `terraform init` with the real S3 backend and `terraform plan` with locking, both environments:
+  62 to add each, lock acquired and released. Bucket and lock table empty afterwards; credits still
+  $73.06.
+
+## 2026-10-20 23:20 EEST: Docker Hub help in Results.md, broken DOCKERHUB_REPO found
+
+**What**
+- `Results.md`: rewrote "1. Docker Hub". It now covers:
+  - which account to use: your own free account, or `grafido`, the existing account that holds the
+    project's images
+  - how to find the username, and how to generate a Read & Write token at app.docker.com
+  - one snippet that asks for the username, token and namespace, checks the login with Docker Hub,
+    and only then replaces `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` and `DOCKERHUB_REPO`
+  - a delete command for the broken variable
+- The summary and the "Updated" line now match.
+
+**Why**
+The user does not know the Docker Hub username or token. A token can't be recovered, only
+generated again. The local GitLab has `DOCKERHUB_REPO` set to the literal text `<your-namespace>`,
+from the old placeholder snippet. That would turn every image name into
+`docker.io/<your-namespace>/...`, so the new snippet prompts for the value instead. Deleting the
+variable myself was blocked by the safety check, so it is left to the user.
+
+**Verified**
+- `bash -n` on all 5 snippets in `Results.md`: syntax OK. They were not run.
+- The login check returns 401 for wrong credentials and 200 for anonymous requests, so it only
+  passes with real credentials.
+
+## 2026-10-21 00:38 EEST: Docker Hub snippet in Results.md explains a rejected login
+
+**What**
+- `Results.md`, section "1. Docker Hub":
+  - the snippet now prints how many characters of token it received, and warns when the input
+    does not start with `dckr_pat_`
+  - on failure it prints Docker Hub's reason (for example "incorrect username or password")
+  - a note on pasting into the hidden prompt: Ctrl+Shift+V or right-click, not Ctrl+V
+- The "Updated" line was refreshed.
+
+**Why**
+The user's first run said "HTTP 401", and nothing was stored. The check itself works: tested with
+dummy credentials against httpbin and Docker Hub. So the token that reached the prompt was wrong,
+most likely an empty paste or the password. The old message could not tell those apart.
+
+**Verified**
+- The check part, run with an empty, a short and a wrong `dckr_pat_` dummy token, prints the
+  length, the warning where expected, and Docker Hub's 401 reason. It stores nothing.
+- `bash -n` on all snippets in `Results.md`: syntax OK.
+
+## 2026-10-21 00:49 EEST: CI secrets checked, commit step added before the merge
+
+**What**
+- `Results.md`, section "4. First deploy": a `git add CHANGELOG.md` and `git commit` step now
+  comes before `git switch main`. There is also a note that `Results.md` stays uncommitted.
+  The "Updated" line was refreshed.
+
+**Why**
+`CHANGELOG.md` differs between `main` and `aws/cheapest-setup` and has uncommitted changes here,
+so `git switch main` would refuse. `Results.md` is a working to-do list, not part of the
+submission.
+
+**Verified**
+- Local GitLab has all 11 variables with the expected flags. Values were checked by length only:
+  - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and the 3 `TF_VAR_*` passwords are protected and
+    masked
+  - `DOCKERHUB_TOKEN` is protected and masked
+  - `DOCKERHUB_USERNAME` and `DOCKERHUB_REPO` are `sntentop`
+- IAM user `code-keeper-ci` exists with `AdministratorAccess` and one active key.
+- The password file is mode 600 and has 3 entries.
+- Docker Hub `sntentop` has 3 public repositories.
+- Found an untracked, not ignored `env.example` in the repo root that holds the Docker Hub token.
+  The user was told to revoke that token and delete the file.
