@@ -310,6 +310,10 @@ infra:apply:staging:
   - terraform --version
 infra:approval:production:
   stage: Approval
+  # Production approval follows the staging apply, not every app job in the
+  # earlier stages.
+  needs:
+  - infra:apply:staging
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule"
     when: never

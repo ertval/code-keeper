@@ -21,9 +21,11 @@ locals {
   # Instance metadata service, required by the RabbitMQ broker nodes.
   imds_address = "169.254.169.254/32"
 
+  # amqp_port is 5671: Amazon MQ for RabbitMQ only listens on AMQPS, and the apps
+  # are given 5671 (modules/rabbitmq/outputs.tf), so 5672 would never connect.
   gateway_port       = 3000
   app_port           = 8080
-  amqp_port          = 5672
+  amqp_port          = 5671
   rabbitmq_mgmt_port = 15672
   postgres_port      = 5432
   https_port         = 443
@@ -112,7 +114,7 @@ resource "aws_security_group" "api_gateway" {
   }
 
   egress {
-    description = "Allow AMQP publishing to RabbitMQ on port 5672 inside the VPC"
+    description = "Allow AMQPS publishing to RabbitMQ on port 5671 inside the VPC"
     from_port   = local.amqp_port
     to_port     = local.amqp_port
     protocol    = "tcp"
@@ -226,7 +228,7 @@ resource "aws_security_group" "billing_app" {
   }
 
   egress {
-    description = "Allow AMQP consumption from RabbitMQ on port 5672 inside the VPC"
+    description = "Allow AMQPS consumption from RabbitMQ on port 5671 inside the VPC"
     from_port   = local.amqp_port
     to_port     = local.amqp_port
     protocol    = "tcp"
@@ -246,7 +248,7 @@ resource "aws_security_group" "rabbitmq" {
   vpc_id      = var.vpc_id
 
   ingress {
-    description     = "AMQP port 5672 from API Gateway and Billing App"
+    description     = "AMQPS port 5671 from API Gateway and Billing App"
     from_port       = local.amqp_port
     to_port         = local.amqp_port
     protocol        = "tcp"

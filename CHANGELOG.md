@@ -197,3 +197,45 @@ repository names and still passes the Terraform `image_repository_prefix` valida
 - `trivy config` 0.76.0 fails on HEAD and on the working tree alike with 8 CRITICAL `AWS-0036`
   findings, so item 11 predates these changes.
 - Not run: Kaniko push, deploy and Terraform jobs; they need Docker Hub and AWS credentials.
+
+## 2026-10-20 01:29 EEST: Secrets Manager, AMQPS port, KMS key policy, needs: chains, requests bump
+
+**What**
+- `infra/modules/compute/main.tf`: the three passwords (`INVENTORY_DB_PASSWORD`, `BILLING_DB_PASSWORD`,
+  `RABBITMQ_PASSWORD`) moved from `environment` to ECS `secrets`. Added
+  `aws_secretsmanager_secret.task` and `aws_secretsmanager_secret_version.task` (one per password,
+  `name_prefix` per environment), an inline execution-role policy allowing
+  `secretsmanager:GetSecretValue` on exactly those secrets, and `depends_on` on the three task
+  definitions so no task starts before its secret has a value (review item 11).
+- `infra/modules/security_groups/main.tf`: `amqp_port` is 5671 instead of 5672, with the rule
+  descriptions updated, so the gateway and billing app can reach Amazon MQ over AMQPS.
+- `infra/modules/rds/main.tf`: the Performance Insights KMS key policy gains an
+  `EnableAccountAdministration` statement (account root, `kms:*`), using new
+  `aws_caller_identity` and `aws_partition` data sources, so KMS's lockout safety check no longer
+  refuses to create the key.
+- `srcs/*/.gitlab-ci.yml`: every app job now has `needs:`. build starts at once (`needs: []`); test
+  needs build; the four change-filtered scans need test; `scan:dependencies` needs test as an
+  optional need; containerize needs test and all scans (optional where change-filtered,
+  `artifacts: false`); `deploy:staging` also needs `containerize:image_scan` and, as an optional
+  need, `infra:apply:staging`; `approval:production` needs `deploy:staging`.
+- `infra/.gitlab-ci.yml`: `infra:approval:production` needs `infra:apply:staging`.
+- `srcs/api-gateway/requirements.txt`: `requests` 2.32.5 to 2.34.2.
+
+**Why**
+The user asked for all four follow-ups. App jobs no longer wait for the infra stages that precede
+them in `stages:`, so a failing infra job stops only the infra chain. Two gaps closed on the way:
+`deploy:staging` used to start in parallel with the image scan, and containerize used to download
+test reports into the Kaniko build context. Secrets Manager was chosen over SSM because the review
+named it; `requests` 2.34.2 is the current release and clears PYSEC-2026-2275.
+
+**Verified**
+- `terraform validate` (1.6, AWS provider 5.100.0 from the lock file) passes for staging and
+  production; `terraform fmt -check -recursive` passes.
+- `trivy config` 0.76.0 with `infra/.trivyignore` now exits 0; before this change it failed with
+  8 CRITICAL `AWS-0036`.
+- GitLab 19.5.0 CI Lint: `valid=true`, 0 errors. The rules and needs simulation passes all 9
+  scenarios, and no `needs:` points at a later stage. `pipeline:lint` run locally resolves all
+  72 `needs:`. `scripts/test_pipelines.sh`: 91 passed, 0 failed.
+- api-gateway `test:unit` (7 passed) and `scan:dependencies` ("No known vulnerabilities found")
+  run locally in `python:3.11-alpine` with `requests` 2.34.2.
+- Not run: `terraform plan`/`apply` (needs AWS).

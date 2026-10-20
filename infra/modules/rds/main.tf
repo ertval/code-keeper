@@ -8,8 +8,28 @@ terraform {
   }
 }
 
+data "aws_caller_identity" "current" {}
+
+data "aws_partition" "current" {}
+
 # Customer managed key for RDS Performance Insights.
 data "aws_iam_policy_document" "performance_insights" {
+  # KMS refuses to create a key whose policy would lock out the caller (the
+  # policy lockout safety check), so the account keeps full control of the key
+  # and IAM policies decide who may administer it.
+  statement {
+    sid    = "EnableAccountAdministration"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+
+    actions   = ["kms:*"]
+    resources = ["*"]
+  }
+
   statement {
     sid    = "AllowRdsServiceAccount"
     effect = "Allow"

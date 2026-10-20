@@ -120,6 +120,47 @@ resource "aws_iam_role_policy_attachment" "ecs_execution_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+# Database and broker passwords reach the containers as ECS `secrets`, which the
+# ECS agent resolves when a task starts. They no longer appear in the task
+# definitions (Trivy AWS-0036) or in `aws ecs describe-task-definition` output.
+# name_prefix keeps a destroy and re-create from colliding with a secret that is
+# still inside its recovery window.
+locals {
+  task_secret_values = {
+    "inventory-db-password" = var.inventory_db_password
+    "billing-db-password"   = var.billing_db_password
+    "rabbitmq-password"     = var.rabbitmq_password
+  }
+}
+
+resource "aws_secretsmanager_secret" "task" {
+  for_each    = toset(["inventory-db-password", "billing-db-password", "rabbitmq-password"])
+  name_prefix = "code-keeper-${var.environment}-${each.key}-"
+  description = "code-keeper ${var.environment} ${each.key}, read by the ECS tasks at start-up"
+}
+
+resource "aws_secretsmanager_secret_version" "task" {
+  for_each      = aws_secretsmanager_secret.task
+  secret_id     = each.value.id
+  secret_string = local.task_secret_values[each.key]
+}
+
+resource "aws_iam_role_policy" "ecs_execution_secrets" {
+  name = "code-keeper-${var.environment}-read-task-secrets"
+  role = aws_iam_role.ecs_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = [for secret in aws_secretsmanager_secret.task : secret.arn]
+      }
+    ]
+  })
+}
+
 # CloudWatch Log Groups
 resource "aws_cloudwatch_log_group" "gateway" {
   name              = "/ecs/code-keeper-${var.environment}/api-gateway"
@@ -165,8 +206,10 @@ resource "aws_ecs_task_definition" "api_gateway" {
         { name = "RABBITMQ_QUEUE", value = "billing_queue" },
         # Without these the clients authenticated as the app's hardcoded dev
         # user, which does not exist on the broker.
-        { name = "RABBITMQ_USER", value = var.rabbitmq_username },
-        { name = "RABBITMQ_PASSWORD", value = var.rabbitmq_password }
+        { name = "RABBITMQ_USER", value = var.rabbitmq_username }
+      ]
+      secrets = [
+        { name = "RABBITMQ_PASSWORD", valueFrom = aws_secretsmanager_secret.task["rabbitmq-password"].arn }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -178,6 +221,11 @@ resource "aws_ecs_task_definition" "api_gateway" {
       }
     }
   ])
+
+  depends_on = [
+    aws_secretsmanager_secret_version.task,
+    aws_iam_role_policy.ecs_execution_secrets,
+  ]
 }
 
 resource "aws_ecs_service" "api_gateway" {
@@ -245,8 +293,10 @@ resource "aws_ecs_task_definition" "inventory_app" {
         { name = "INVENTORY_DB_HOST", value = var.inventory_db_host },
         { name = "INVENTORY_DB_PORT", value = "5432" },
         { name = "INVENTORY_DB_NAME", value = var.inventory_db_name },
-        { name = "INVENTORY_DB_USER", value = var.inventory_db_username },
-        { name = "INVENTORY_DB_PASSWORD", value = var.inventory_db_password }
+        { name = "INVENTORY_DB_USER", value = var.inventory_db_username }
+      ]
+      secrets = [
+        { name = "INVENTORY_DB_PASSWORD", valueFrom = aws_secretsmanager_secret.task["inventory-db-password"].arn }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -258,6 +308,11 @@ resource "aws_ecs_task_definition" "inventory_app" {
       }
     }
   ])
+
+  depends_on = [
+    aws_secretsmanager_secret_version.task,
+    aws_iam_role_policy.ecs_execution_secrets,
+  ]
 }
 
 resource "aws_ecs_service" "inventory_app" {
@@ -322,14 +377,16 @@ resource "aws_ecs_task_definition" "billing_app" {
         { name = "BILLING_DB_PORT", value = "5432" },
         { name = "BILLING_DB_NAME", value = var.billing_db_name },
         { name = "BILLING_DB_USER", value = var.billing_db_username },
-        { name = "BILLING_DB_PASSWORD", value = var.billing_db_password },
         { name = "RABBITMQ_HOST", value = var.rabbitmq_host },
         { name = "RABBITMQ_PORT", value = tostring(var.rabbitmq_port) },
         { name = "RABBITMQ_QUEUE", value = "billing_queue" },
         # Without these the clients authenticated as the app's hardcoded dev
         # user, which does not exist on the broker.
-        { name = "RABBITMQ_USER", value = var.rabbitmq_username },
-        { name = "RABBITMQ_PASSWORD", value = var.rabbitmq_password }
+        { name = "RABBITMQ_USER", value = var.rabbitmq_username }
+      ]
+      secrets = [
+        { name = "BILLING_DB_PASSWORD", valueFrom = aws_secretsmanager_secret.task["billing-db-password"].arn },
+        { name = "RABBITMQ_PASSWORD", valueFrom = aws_secretsmanager_secret.task["rabbitmq-password"].arn }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -341,6 +398,11 @@ resource "aws_ecs_task_definition" "billing_app" {
       }
     }
   ])
+
+  depends_on = [
+    aws_secretsmanager_secret_version.task,
+    aws_iam_role_policy.ecs_execution_secrets,
+  ]
 }
 
 resource "aws_ecs_service" "billing_app" {
