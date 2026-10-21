@@ -2799,7 +2799,7 @@ ctl_runner_live() {
   local host
   host="$(inventory_host gitlab_runners)"
   live_probe RUNNER-LIVE-LIST "${host}" "runner registration/execution cannot be observed locally" \
-    "ssh $(ssh_target "${host}") 'sudo gitlab-runner list && systemctl is-active gitlab-runner'"
+    "ssh $(ssh_target "${host}") 'sudo gitlab-runner list 2>&1 | sed -E \"s/(Token[^=]*=)[^ ]+/\\1<redacted>/\" && systemctl is-active gitlab-runner'"
   if command -v gitlab-runner >/dev/null 2>&1; then
     emit_detail "note: gitlab-runner is installed here but no GitLab instance is reachable"
   else

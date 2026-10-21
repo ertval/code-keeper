@@ -43,4 +43,4 @@
           - >-
             Registered runners: {{ (runner_status.stderr_lines + runner_status.stdout_lines)
             | map('regex_replace', '\x1b\[[0-9;]*m', '')
-            | map('regex_replace', 'Token=\S+', 'Token=<hidden>') | list }}
+            | map('regex_replace', 'Token=\S+', 'Token=<redacted>') | list }}

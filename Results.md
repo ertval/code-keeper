@@ -1,22 +1,28 @@
 # Results
 
-- **Updated:** 2026-10-21 13:05 EEST
+- **Updated:** 2026-10-21 22:03 EEST
 - **Scope:** the deploy described in `docs/AWS_SETUP.md`, run against AWS account `REDACTED_AWS_ACCOUNT_ID`
-  (us-east-1) from the local test GitLab (`root/code-keeper`), plus what the project still lacks for
-  the audit.
-- **Code:** the deploy ran `5d9f578`. Since then: the Ansible fixes, GitLab on EC2, the split into
-  four repositories and the docs refresh, all uncommitted on top of `5f2d0c6`.
+  (us-east-1), first from the local test GitLab (`root/code-keeper`), then from the GitLab on EC2
+  that Ansible installed, plus what the project still lacks for the audit.
+- **Code:** the four EC2 pipelines ran commit `c0c3213`, split into its four repositories. Not yet
+  committed: the publish script fix, the runner token placeholder, the regenerated reports and the
+  doc drafts.
 
 ## Summary
 
-**Staging and production are both deployed and work end to end.** Pipeline 14 passed every job, from
-the tests through both Terraform applies, the manual approvals and the three production deploys.
+**Everything the audit needs runs.** GitLab CE 19.5.0 and its runner were installed on EC2 by
+Ansible, the four repositories are published on it, and their first pipelines passed every job, from
+the tests through the infra plans and applies, the manual approvals and the three production deploys.
+
+**Staging and production are both deployed and work end to end.** First pipeline 14 on the local
+GitLab, then the four pipelines on the EC2 GitLab, passed every job.
 Requests through each environment's load balancer reach the inventory database, and billing orders
 go through RabbitMQ (TLS on port 5671) into the billing database.
 
-**Cost:** both environments together cost about $0.79 an hour. The AWS account is now on the paid
-plan, and the remaining **$92.02** of credits pays first, which covers about 4.5 days. After that AWS
-bills the card, so take both environments down when testing is over (see "Next").
+**Cost:** both environments together cost about $0.79 an hour, and the two GitLab hosts about $0.14,
+so about $0.93 an hour or $22 a day. The AWS account is on the paid plan; at 13:05 the remaining
+credits were **$92.02**, which pay first. After that AWS bills the card, so take everything down when
+testing is over (see "Next").
 
 ---
 
@@ -39,7 +45,15 @@ End-to-end check, run once per environment through the load balancer:
   '20'". Those two test orders are still in the billing databases.
 
 Images: `docker.io/sntentop/{api-gateway,inventory-app,billing-app}`, tagged with the commit SHA, plus
-`production-latest` for the promoted image.
+`production-latest` for the promoted image. Both environments now run the images built by the EC2
+pipelines: `api-gateway:0758a5c5`, `inventory-app:ae7b51da` and `billing-app:85fb0afa`. After that
+deploy, `/health`, `/api/movies` and `/docs` answer `200` through both load balancers.
+
+| GitLab on EC2 | |
+|---|---|
+| GitLab CE 19.5.0 | `http://23.21.56.248`, `t3.large`; log in as `root` with `GITLAB_ROOT_PASSWORD` from `~/.config/code-keeper.env` |
+| Runner 19.5.0 | `54.82.149.95`, `t3.medium`; `docker-shared-runner-01`, Docker executor, online |
+| Group `code-keeper` | private; projects `infra`, `api-gateway`, `inventory-app`, `billing-app`, each with "pipelines must succeed"; 5 group CI/CD variables and 6 on `infra` |
 
 ---
 
@@ -52,6 +66,23 @@ Images: `docker.io/sntentop/{api-gateway,inventory-app,billing-app}`, tagged wit
 | 12 | `7d77352` | Staging infra applied, staging deploys failed, production infra failed | `amazon/aws-cli` has no `tar`, so the deploy jobs could not unpack `crane`. Fixed in `5d9f578`, which also replaced the promote jobs' image tag `crane:0.20.2` (does not exist, and the plain crane images have no shell) with crane's `debug` image pinned by digest. Production failed with `InstanceQuotaExceeded`: the Free plan allows only 2 RDS instances, and staging used both. Fixed by upgrading the account to the paid plan |
 | 13 | `5d9f578` | Staging deploys passed; approvals left waiting | An app-only push has no infra jobs, so its production deploys would not wait for production infra. Leave its approvals alone |
 | 14 | `5d9f578` (started from the API, runs every job) | **Passed, every job** | Production infra added the 6 missing resources, then all three apps were promoted and deployed |
+
+## Pipelines on the EC2 GitLab
+
+Published with `scripts/publish_repos.sh` from commit `c0c3213` on 2026-10-21 at 21:20 EEST.
+
+| Project | Pipeline | Commit | Result |
+|---|---|---|---|
+| `infra` | #1 | `c8ec62c` | **Passed, 10 jobs.** Both plans "No changes"; staging applied; production approved by root, apply "0 added, 0 changed, 0 destroyed" |
+| `api-gateway` | #2 | `0758a5c` | **Passed, 13 jobs.** Build, test, five scans, image build and scan, staging deploy, approval by root, promote, production deploy |
+| `inventory-app` | #3 | `ae7b51d` | **Passed, 13 jobs**, same stages |
+| `billing-app` | #4 | `85fb0af` | **Passed, 13 jobs**, same stages |
+
+From the push until all four waited for approval took 14 minutes; the production deploys after the
+approvals took 5.
+The first publish attempt failed before any push: the terminal was a VS Code terminal whose git
+password helper was disconnected, so git sent an empty password. `scripts/publish_repos.sh` now asks
+for the password itself and keeps git's helpers out of it.
 
 ---
 
@@ -71,14 +102,15 @@ Images: `docker.io/sntentop/{api-gateway,inventory-app,billing-app}`, tagged wit
 
 ## Next
 
-1. **Test** whatever you want to test now, while it runs.
-2. **Take it down.** Tell Claude when testing is over. Claude then runs `terraform destroy` for
-   production and then staging, and checks that nothing billable is left (`docs/AWS_SETUP.md`). The
-   state bucket and lock table stay; they cost almost nothing.
-3. **Commit** the uncommitted work and copy the drafts from `drafts/` into `docs/`.
-4. **GitLab on EC2:** `ansible/terraform`, then `ansible-playbook playbooks/site.yml`, then
-   `scripts/publish_repos.sh` (`drafts/AWS_SETUP.md` steps 8 and 9).
-5. **Before the audit,** redeploy from the four projects on that GitLab (`drafts/AWS_SETUP.md`
+1. **Docs and commit.** Copy the drafts from `drafts/` into `docs/`, commit and push, then run
+   `scripts/audit_orchestrator.sh` once more and commit `reports/`, so the report names that commit
+   (`docs/AUDIT_READINESS_PLAN.md` step 1).
+2. **Rehearse** the audit with `docs/AUDIT_GUIDE.md`, while everything runs.
+3. **Take it down.** Tell Claude when testing is over. Claude then runs `terraform destroy` for
+   production and then staging, then for the GitLab hosts, and checks that nothing billable is left
+   (`docs/AWS_SETUP.md` steps 13 and 14). The state bucket and lock table stay; they cost almost
+   nothing.
+4. **Before the audit,** bring it back up and redeploy from the four projects (`docs/AWS_SETUP.md`
    step 12). Allow about an hour from a torn-down account.
 
 ---
@@ -88,10 +120,10 @@ Images: `docker.io/sntentop/{api-gateway,inventory-app,billing-app}`, tagged wit
 | Item | Status |
 |---|---|
 | Fix the pipeline and infra bugs | **Done**, including the deploy fixes above |
-| AWS deploy with one full green pipeline | **Done**: pipeline 14 |
-| GitLab and runner installed with Ansible | **Ready, not run yet.** Fixed and tested against the local GitLab 19.5; the EC2 hosts come from `ansible/terraform/` |
-| One repository per app and one for infra | **Ready, not published yet.** Four standalone pipelines, published by `scripts/publish_repos.sh` |
-| Docs match the code | **Done for `README.md`.** `docs/` drafts are in `drafts/` |
+| AWS deploy with one full green pipeline | **Done**: pipeline 14, then the four EC2 pipelines |
+| GitLab and runner installed with Ansible | **Done** on two EC2 hosts from `ansible/terraform/` |
+| One repository per app and one for infra | **Done.** Four projects in the `code-keeper` group, published by `scripts/publish_repos.sh`, each pipeline green to production |
+| Docs match the code | **Done for `README.md`.** The new `docs/` files are ready in `drafts/` |
 
 What changed for each:
 
@@ -113,7 +145,10 @@ What changed for each:
     compares the lock file with the newest allowed and the newest released provider versions.
   - The stale `backend.hcl` and `image_repository_prefix` comments are corrected.
   - `scripts/audit_orchestrator.sh` is executable again.
-  - `reports/` is regenerated on this machine.
+  - `reports/` is regenerated on this machine, against the live EC2 hosts.
+  - The playbook summary printed the runner token from `gitlab-runner list`. That token was reset,
+    and the summary, the README demo and the audit script's hint now show `Token=<redacted>`.
+  - `scripts/publish_repos.sh` asks for the GitLab password itself (see above).
 
 Still open (the code items are also in section 12 of `README.md`):
 
@@ -128,3 +163,5 @@ Still open (the code items are also in section 12 of `README.md`):
 - The Trivy, Gitleaks, SonarQube and AWS CLI images use `:latest`.
 - SonarQube is not configured, so the SonarQube jobs pass without uploading anything.
 - The pipelines' IAM user has `AdministratorAccess`.
+- `docs/AUDIT_GUIDE.md` section 10.2 says `srcs/` is the team's own crud-master code; confirm that
+  before the audit.

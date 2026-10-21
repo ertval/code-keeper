@@ -24,9 +24,10 @@
 #   GITLAB_URL          GitLab address (terraform -chdir=ansible/terraform output -raw gitlab_url)
 #   GITLAB_GROUP        group path (default: code-keeper)
 #   GITLAB_USER         user for HTTP pushes (default: root)
-#   GITLAB_PUSH_TOKEN   optional personal access token with write_repository. It is
-#                       passed to git through the environment, never on the command
-#                       line or in .git/config. Without it, git asks for the password.
+#   GITLAB_PUSH_TOKEN   optional personal access token with write_repository (the
+#                       password works too). It is passed to git through the
+#                       environment, never on the command line or in .git/config.
+#                       Without it, the script asks for the password once.
 #   GITLAB_REMOTE_BASE  optional remote prefix that replaces GITLAB_URL/GITLAB_GROUP,
 #                       for example git@203.0.113.10:code-keeper to push over SSH
 #                       with a key added to your GitLab profile
@@ -50,7 +51,7 @@ for arg in "$@"; do
   case "${arg}" in
     --dry-run) DRY_RUN=1 ;;
     -h | --help)
-      sed -n '2,32p' "$0"
+      sed -n '2,33p' "$0"
       exit 0
       ;;
     *)
@@ -71,10 +72,6 @@ if [ -n "${GITLAB_REMOTE_BASE:-}" ]; then
   REMOTE_BASE="${GITLAB_REMOTE_BASE%/}"
 elif [ -n "${GITLAB_URL:-}" ]; then
   REMOTE_BASE="${GITLAB_URL%/}/${GITLAB_GROUP}"
-  # Without a token, put the user in the URL so git only asks for the password.
-  if [ -z "${GITLAB_PUSH_TOKEN:-}" ]; then
-    REMOTE_BASE="${REMOTE_BASE/:\/\//://${GITLAB_USER}@}"
-  fi
 elif [ "${DRY_RUN}" -eq 0 ]; then
   echo "ERROR: set GITLAB_URL (or GITLAB_REMOTE_BASE), for example:" >&2
   echo "  GITLAB_URL=\$(terraform -chdir=ansible/terraform output -raw gitlab_url) $0" >&2
@@ -83,11 +80,38 @@ else
   REMOTE_BASE="<GITLAB_URL>/${GITLAB_GROUP}"
 fi
 
-if [ -n "${GITLAB_PUSH_TOKEN:-}" ] && [ -z "${GITLAB_REMOTE_BASE:-}" ]; then
-  export GIT_CONFIG_COUNT=1
-  export GIT_CONFIG_KEY_0="http.extraHeader"
-  GIT_CONFIG_VALUE_0="Authorization: Basic $(printf '%s:%s' "${GITLAB_USER}" "${GITLAB_PUSH_TOKEN}" | base64 | tr -d '\n')"
-  export GIT_CONFIG_VALUE_0
+# HTTP pushes send the token (or password) in a header built here, and git is kept away
+# from askpass programs and credential helpers. Otherwise an editor terminal's askpass
+# (VS Code sets GIT_ASKPASS) can answer with an empty password when the editor is not
+# connected, and `credential.helper store` would save the root password in plain text
+# in ~/.git-credentials. The password is asked for once, not once per project.
+if [ -z "${GITLAB_REMOTE_BASE:-}" ] && [ -n "${GITLAB_URL:-}" ] && [ "${DRY_RUN}" -eq 0 ]; then
+  if [ -z "${GITLAB_PUSH_TOKEN:-}" ]; then
+    if ! { read -rsp "GitLab password (or token) for ${GITLAB_USER} at ${GITLAB_URL%/}: " GITLAB_PUSH_TOKEN </dev/tty; } 2>/dev/null; then
+      echo "ERROR: no terminal to ask for the password; set GITLAB_PUSH_TOKEN instead" >&2
+      exit 1
+    fi
+    echo
+  fi
+  if [ -z "${GITLAB_PUSH_TOKEN}" ]; then
+    echo "ERROR: the password is empty" >&2
+    exit 1
+  fi
+  unset GIT_ASKPASS SSH_ASKPASS
+  export GIT_TERMINAL_PROMPT=0
+  export GIT_CONFIG_COUNT=2
+  export GIT_CONFIG_KEY_0="credential.helper"
+  export GIT_CONFIG_VALUE_0=""
+  export GIT_CONFIG_KEY_1="http.extraHeader"
+  GIT_CONFIG_VALUE_1="Authorization: Basic $(printf '%s:%s' "${GITLAB_USER}" "${GITLAB_PUSH_TOKEN}" | base64 | tr -d '\n')"
+  export GIT_CONFIG_VALUE_1
+fi
+
+# Check access once before splitting, so a wrong password stops here with a clear message.
+if [ "${DRY_RUN}" -eq 0 ] && ! git ls-remote --heads "${REMOTE_BASE}/${SELECTED[0]}.git" >/dev/null; then
+  echo "ERROR: cannot read ${REMOTE_BASE}/${SELECTED[0]}.git as ${GITLAB_USER}." >&2
+  echo "       Check the password (or token) and that the project exists in GitLab." >&2
+  exit 1
 fi
 
 # git subtree relies on GNU dirname ("infra/." -> "infra"). Ubuntu 25.10 ships the

@@ -1,234 +1,126 @@
 # Code-Keeper: Submission Readiness Review
 
-- **Reviewed:** 2026-10-16, commit `feb4b14` on `main`
+- **First review:** 2026-10-16, commit `feb4b14`. **Updated:** 2026-10-21 evening, after commit
+  `c0c3213` and the first runs on the EC2 GitLab.
 - **Question:** is the project ready to be turned in against `docs/readme.md` and `docs/audit.md`?
-- **Verdict:** **No, not yet.**
-
-There are two separate problems, and either one on its own would fail the audit:
-
-1. **Nothing is running.** Most of the audit is live demos. The repo's own docs say there is no GitLab
-   instance, no runner and no AWS deployment behind any of it.
-2. **The pipelines wouldn't run even on a real GitLab.** GitLab would reject the configuration before
-   creating a pipeline, and several later steps would fail even after that is fixed.
+- **Verdict:** **Yes, once the docs are in place.** GitLab and its runner were installed on EC2 by
+  Ansible, the four repositories are published on it, and their first pipelines passed every job
+  from build to production. What is left is moving these drafts into `docs/`, one commit, and a
+  rehearsal.
 
 ---
 
-## 1. The audit needs live systems that don't exist
+## 1. Status of the first review's findings
 
-The repository admits this itself:
+### Live systems (first review, section 1)
 
-- `README.md:257`: the Terraform is "designed and statically validated, not deployed. There is no
-  committed state file and no AWS account behind these environments".
-- `docs/AUDIT_READINESS_PLAN.md`: "No GitLab instance anywhere", the playbook "has never been
-  executed", and the `ansible/inventory/hosts.ini` IPs (`192.168.56.10`, `192.168.56.11`) are the
-  crud-master VMs. Its own table marks AQ02, AQ03, AQ04, AQ06 and AQ10 as FAIL.
-
-So these audit questions can't pass today:
-
-| Audit question (`docs/audit.md`) | Needs |
+| Finding | Status |
 |---|---|
-| Was the GitLab instance deployed and configured successfully using Ansible? (line 59) | A running GitLab host, shown with `systemctl status` / `gitlab-ctl status` |
-| Are the GitLab Runners integrated and executing tasks for all repositories? (line 61) | A registered runner and real job logs |
-| Did the student deploy the infrastructure for two environments on a cloud platform using Terraform? (line 65) | Applied staging and production stacks on AWS |
-| Are the pipelines working properly and updating the application and infrastructure after each modification? (line 92) | A green pipeline run from commit to production |
+| No AWS deployment | **Done.** Staging and production applied on AWS; pipeline 14 went green from commit to production on 2026-10-21, both `/health` checks answer |
+| No GitLab instance, no runner | **Done.** `ansible/terraform/` created the two EC2 hosts and `playbooks/site.yml` installed GitLab CE 19.5.0 and the runner on 2026-10-21; a second run only renews the two one-day API tokens |
+| The inventory pointed at the crud-master VMs | **Done.** `ansible/inventory/aws.ini` is written by Terraform; `hosts.ini` is only an example |
 
-`docs/readme.md:241` says: "Your Solution must be running and your users and applications repository
-and CI/CD must be configured correctly for the audit session."
+### Pipeline bugs (first review, section 2)
 
----
+| # | Finding | Status |
+|---|---|---|
+| 1 | `before_script` inside `rules:` | Fixed (`779d895`) |
+| 2 | `needs:` on a job that might not exist | Fixed (`779d895`) |
+| 3 | pytest, bandit, pip-audit never installed | Fixed, pinned versions installed in each job (`2b54962`) |
+| 4 | Trivy job calls terraform | Fixed (`64e81a9`) |
+| 5 | Staging apply on every push | Fixed (`64e81a9`); since the split, Init, Plan and Apply run on every `main` pipeline of `infra` |
+| 6 | Broken Kaniko login file | Fixed (`64e81a9`) |
+| 7 | `${VAR:-default}` and 3-part Docker Hub names | Fixed (`64e81a9`); images are `docker.io/<namespace>/<service>` |
+| 8 | Unreachable staging health check | Fixed (`64e81a9`); the gateway is checked through the ALB |
+| 9 | Production stops updating after the first release | Fixed (`64e81a9`); every deploy registers the SHA image |
+| 10 | Script lines parsed as mappings | Fixed (`779d895`) |
+| 11 | Trivy CRITICAL on plaintext passwords | Fixed (`c62effa`); the passwords come from Secrets Manager |
+| | `containerize` on merge requests | Now intended: merge requests build without pushing (`--no-push`), `main` pushes |
+| | `terraform outdated` is not a command | Fixed (`330e8de`); the job now compares the lock file with the newest allowed and the newest released provider versions |
+| | Plan and validate jobs without `terraform init` | Fixed (`7a9611c`) |
 
-## 2. Pipeline bugs (confirmed by parsing the YAML)
+### Infrastructure (first review, section 3)
 
-Line numbers refer to `srcs/api-gateway/.gitlab-ci.yml` unless stated otherwise. The same defects
-exist in `srcs/inventory-app/.gitlab-ci.yml` and `srcs/billing-app/.gitlab-ci.yml`, shifted by two
-lines after line 28.
+| Finding | Status |
+|---|---|
+| RabbitMQ security groups on 5672 | Fixed, 5671 (`c62effa`) |
+| KMS key policy locks out its creator | Fixed (`c62effa`) |
+| RDS 15.4 and RabbitMQ 3.11.20 no longer offered | Fixed, RDS `15` and RabbitMQ `4.2` (`e9ed580`) |
+| Legacy runner registration tokens | Fixed (`330e8de`); the runner is created with `POST /user/runners` and registered with its `glrt-` token, which is reused while valid |
+| `gitlab_version` unpinned | Fixed (`330e8de`); GitLab `19.5.0-ce.0`, runner `19.5.0-1` and its helper images pinned |
+| `allowed_to_push => [40]` | Fixed (`330e8de`); the settings go through the API as `[{access_level: 40}]` and are checked after |
+| Passwords as plain `environment` entries | Fixed (`c62effa`) |
+| `.tfplan` artifacts contain the passwords | **Open** (section 3) |
 
-The first two, and item 10 below, stop GitLab from creating any pipeline at all.
+### Repository layout (first review, section 4)
 
-1. **Bad `rules:` in 9 jobs.** In `test:unit`, `scan:sast_bandit` and `scan:dependencies` for all three
-   services, the `before_script` lines ended up inside the `rules:` list (`:70-72`, `:114-116`,
-   `:274-276`). GitLab requires each rule to be a hash, so it rejects the whole configuration. Those
-   jobs also lose their `cd "${APP_DIR}"`, so they would run from the repository root.
-2. **A `needs:` that points at a missing job.** `infra:apply:production` needs `infra:plan:production`
-   (`infra/.gitlab-ci.yml:330-332`). The plan job only exists when `infra/**` changed, and the need is
-   not marked `optional: true`, so any other push to `main` gets no pipeline.
-3. **Tools are never installed.** `pytest` (`:75`), `bandit` (`:119`) and `pip-audit` (`:280`) run in a
-   bare `python:3.11-alpine` image. The Build job's `pip install` happens in a different container and
-   does not carry over. pip-audit sits inside an `if/else`, so it "passes" without scanning anything.
-4. **The Trivy job calls terraform.** `infra:validate:security` runs `terraform --version`
-   (`infra/.gitlab-ci.yml:145-146`) inside the `aquasec/trivy` image, which has no terraform. Validate
-   fails, and on any infra change every later stage is skipped, app jobs included.
-5. **`infra:apply:staging` runs on every push to main** (`infra/.gitlab-ci.yml:276`, no `changes:`
-   rule). Without a plan file it fails. Because "Apply to Staging" comes before "Build" in the root
-   `stages:` list, every app pipeline stops there.
-6. **The Kaniko login file is broken.** `:329` passes a Python `.format()` template to `printf`. Run
-   locally, the output is `{{"auths":{{...{0}...`, which is not valid JSON, so the image push fails. A
-   correct version of the same line already exists at `:504`.
-7. **Image names don't resolve.** `${DOCKERHUB_REPO:-grafido}` (`:41` and every job, plus
-   `infra/.gitlab-ci.yml:52`) is bash syntax. GitLab's `variables:` only expand `$VAR` and `${VAR}`,
-   with no `:-` defaults, so the fallback never applies. Even with that fixed,
-   `grafido/code-keeper/api-gateway` has three path parts, and Docker Hub only accepts two
-   (`namespace/repo`). `AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"` has the same problem.
-8. **The staging health check can never pass.** `curl http://staging.code-keeper.internal/health`
-   (`:439`; `:8080` in the other two services) targets a DNS name that nothing creates. The only private
-   zone is `${environment}.local` (`infra/modules/compute/main.tf:77`), and the runner sits on a local
-   192.168.56.x network anyway. So `deploy:staging` always fails, and production is never reached.
-9. **Production stops updating after the first release.** Production deploys the reusable
-   `:production-latest` tag (`:542`). From the second release on, the job finds the task definition
-   "already runs" that image (`:559`), skips `update-service`, and the old image keeps running. Audit
-   line 92 checks exactly this.
+| Finding | Status |
+|---|---|
+| Infra not in an independent repository | **Done.** `infra/` has a standalone pipeline and is published to `code-keeper/infra` by `scripts/publish_repos.sh` |
+| Apps share one repository | **Done.** Each `srcs/<app>` has a standalone pipeline and is published to `code-keeper/<app>` |
 
-Smaller issues:
+### Documentation (first review, section 5)
 
-- `containerize:*` also runs on merge-request pipelines (`:310`), although the README says it is
-  restricted to `main`.
-- `terraform outdated` (`infra/.gitlab-ci.yml:183`) is not a Terraform command; the job always
-  "succeeds" through its `|| echo` fallback.
-- `infra:validate:syntax` and the plan jobs never run `terraform init`. They depend on a cache that the
-  two parallel init jobs overwrite, so the first run is unreliable.
-
-### Found after the review
-
-10. **Script lines that YAML reads as mappings.** 71 `script:` entries in 23 jobs (13 in
-    `infra/.gitlab-ci.yml`, 20 in `srcs/api-gateway/.gitlab-ci.yml`, 19 in each of the other two)
-    contain `: ` without quotes, for example `- echo " Commit: ${CI_COMMIT_SHA} by ${GITLAB_USER_NAME}"`.
-    YAML turns each one into a one-key mapping, and GitLab requires every script entry to be a string,
-    so it rejects the whole configuration. Found on 2026-10-19 by validating the files against
-    GitLab's `ci.json` schema.
-11. **The Trivy IaC gate fails on plaintext passwords.** Once item 4 is fixed and
-    `infra:validate:security` reaches its scan, `trivy config` (0.76.0, from the unpinned
-    `aquasec/trivy:latest`) reports 8 CRITICAL `AWS-0036` findings: `INVENTORY_DB_PASSWORD`,
-    `BILLING_DB_PASSWORD` and `RABBITMQ_PASSWORD` are plain `environment` entries in the task
-    definitions (`infra/modules/compute/main.tf`), for both environments. `infra/.trivyignore` does
-    not cover them, so the job fails and every later infra stage is skipped. The fix is the one in
-    the security notes below: pass these values as `secrets` from Secrets Manager or SSM. Found on
-    2026-10-20 by running the job's scan locally.
-
-### Why the committed audit report is green
-
-`reports/audit_report.json` shows 83 PASS and 0 FAIL because `scripts/test_pipelines.sh`,
-`scripts/verify_security.sh` and `scripts/audit_orchestrator.sh` only check that the YAML parses and
-that the stage names exist. They never validate the configuration against GitLab's schema or run a
-job. The report was also generated on another machine (`/home/ertval/...`), against an older commit
-(`3128a21`) with uncommitted changes (`"dirty": true`).
+| Finding | Status |
+|---|---|
+| README describes DinD, GitLab Registry, wrong tags, main-only pipelines, missing files | **Fixed.** `README.md` rewritten against the current code |
+| `docs/AUDIT_GUIDE.md` contradicts itself and the code | **Fixed** in this version |
+| `docs/AWS_SETUP.md` lacks Free plan limits, redeploy and first image tags | **Fixed** in this version |
+| `backend.hcl` says Terraform 1.9.5 | Fixed (`330e8de`) |
+| `reports/audit_report.json` stale, from another machine | Regenerated on this machine against the live EC2 hosts. Run `scripts/audit_orchestrator.sh` once more after the commit, so the report names that commit |
+| `docs/AUDIT_READINESS_PLAN.md` lists the audit failures | **Fixed:** it now lists the remaining steps |
 
 ---
 
-## 3. Infra bugs
+## 2. What has been tested, and how
 
-These two would break things for sure:
-
-- **RabbitMQ port mismatch.** Amazon MQ for RabbitMQ only listens on 5671 (AMQPS), and the apps are
-  correctly told to use 5671 (`infra/modules/rabbitmq/outputs.tf:28`). But every security group rule
-  opens 5672 (`infra/modules/security_groups/main.tf:26`, used at `:116`, `:230` and `:250`), so neither
-  the gateway nor the billing app can reach the broker.
-- **The KMS key policy locks out its creator.** The policy in `infra/modules/rds/main.tf:12-37` only
-  grants `rds.amazonaws.com`. KMS's policy lockout safety check refuses to create a key the caller
-  couldn't manage afterwards, so `terraform apply` stops there.
-
-These are likely problems, worth checking on the real targets:
-
-- RDS `engine_version = "15.4"` (`infra/modules/rds/main.tf:66`, `:94`) and Amazon MQ `3.11.20`
-  (`infra/modules/rabbitmq/main.tf:14`) are old versions that AWS may no longer allow for new instances.
-- The runner registers with `--registration-token` plus `--tag-list`, `--locked` and `--access-level`
-  (`ansible/roles/gitlab_runner/tasks/register.yml:27-40`). Current GitLab disables legacy
-  registration tokens by default and rejects those flags with the new `glrt-` tokens.
-  `gitlab_version` is unpinned, so the playbook installs the latest release.
-- `ansible/roles/gitlab/tasks/cicd.yml:17-21` passes `allowed_to_push => [40]`, where GitLab's
-  `default_branch_protection_defaults` probably expects `[{access_level: 40}]`, so `update!` would
-  raise and the task would fail.
-
-Security notes:
-
-- Database and broker passwords are passed to the task definitions as plain `environment` entries
-  (`infra/modules/compute/main.tf`), not as `secrets` from Secrets Manager or SSM.
-- The `.tfplan` files saved as job artifacts contain those passwords and can be downloaded for 7 days.
+| Part | Evidence |
+|---|---|
+| AWS environments | Pipeline 14 on the local GitLab: staging and production applied, three services stable in each, `/health` through both ALBs, image promotion and production deploy |
+| GitLab on EC2 | `playbooks/site.yml` on the two hosts from `ansible/terraform/`: GitLab CE 19.5.0 and runner 19.5.0 installed; root password, sign-up off, branch protection, the private group with its four projects ("pipelines must succeed") and CI/CD variables checked in GitLab afterwards; runner online; a rerun changes only the two one-day API tokens; an invalid runner token is detected, reset and verified |
+| Four pipelines on EC2 | First run after `scripts/publish_repos.sh`: infra #1, api-gateway #2, inventory-app #3, billing-app #4, every job passed (49 jobs). Both infra plans "No changes"; production apply "0 added, 0 changed, 0 destroyed". Production approved by root; staging and production run the images tagged with the new commits; `/health`, `/api/movies` and `/docs` answer 200 through both ALBs |
+| Ansible roles | First against a local GitLab 19.5: instance settings, group, projects, member and runner created; a second run only rotates the API token; an invalid runner token is detected and reset; `config.toml` mode 600. Variables tested against a mock API (update, then create on 404). ansible-lint 0 failures at the production profile |
+| Split pipelines | All four files accepted by GitLab's CI lint API, with no dangling `needs:`; the merge request image build (`--no-push`) run locally |
+| Publish script | `git subtree split` and push to bare repositories in a throwaway clone; idempotent; shellcheck clean; then the real publish to the EC2 GitLab. It asks for the password itself, so an editor's git helper or `credential.helper store` never sees it |
+| Local checks | `scripts/test_pipelines.sh` 89 pass, 0 fail; `scripts/verify_security.sh` 78 pass, 1 known false positive; `scripts/audit_orchestrator.sh` with its live checks on the EC2 hosts in `ansible/inventory/aws.ini`: 84 pass, 0 fail, 0 blocked, 4 skipped for tools that are not installed (checkov, hadolint, tflint, tfsec) |
 
 ---
 
-## 4. Repo layout fails two requirements
+## 3. Still open
 
-The README admits both (`README.md:494`, "Known deviations from the brief"), but admitting it doesn't
-pass the rubric item:
+These are known, documented in section 12 of `README.md`, and fine to explain in the audit:
 
-- "Your infrastructure configuration must exist in an independent repository with a configured
-  pipeline" (`docs/readme.md:130-131`, audit line 69). Here `infra/` is a subfolder of the same repo.
-- "Each application must exist in a single repository" (`docs/readme.md:116`). Here all three apps
-  share one repo.
-
----
-
-## 5. Docs contradict the code
-
-The auditor grades the documentation (audit lines 114 and 116), and these statements no longer match
-the code:
-
-- **Image build and registry:** `README.md` §3.3 and Q15 describe Docker-in-Docker with `docker:24.0.5`
-  and the GitLab Container Registry. The code builds with Kaniko and pushes to Docker Hub.
-- **Release tags:** the README says the pipeline pushes `staging-latest` and never pushes
-  `production-latest`. The code pushes no `staging-latest`, and `promote:image` does push
-  `production-latest`. It also mentions `--force-new-deployment`, which the code doesn't use.
-- **When pipelines run:** README §3.4 and "Known deviations" say pipelines are main-only with no
-  merge-request pipelines. The root `workflow:` now allows merge requests and every branch.
-- **Branch protection:** README §4.1 says `gitlab_default_branch_protection` is unused and Developers
-  can merge. `cicd.yml` now uses it and limits merges to Maintainers.
-- **Missing files and features:** the directory tree lists `tests/test_inventory.py` and
-  `tests/test_billing.py`, which don't exist. "Auto-scaling" isn't implemented, `config.toml.j2` is
-  never deployed, and the "GitLab CI Passing" badge is static.
-- **`docs/AUDIT_GUIDE.md`:** §4.4 says "YES", deployed on AWS, while §6.3 says "there is no AWS
-  account, no reachable GitLab". It still describes the dev credential fallbacks, an unwired backend
-  and DinD, all of which have changed. `infra/environments/*/backend.hcl` says Terraform 1.9.5; CI uses
-  `hashicorp/terraform:1.6`.
-
-### Remove or refresh before submitting
-
-- `docs/AUDIT_READINESS_PLAN.md`: an internal work plan that lists the project's audit failures one by
-  one.
-- `reports/audit_report.json`: stale, generated from another user's path, against an older commit with
-  uncommitted changes.
+- **Plan artifacts contain secrets.** `<env>.tfplan` holds the passwords; project members can
+  download it for 7 days. Fix: shorten `expire_in` on the plan jobs, or limit downloads
+  with `artifacts:access` (check that the apply jobs still receive the plan).
+- **Some job images use `:latest`**: Trivy, Gitleaks, SonarQube scanner, AWS CLI. Fix: pin a version
+  or digest, like Kaniko and crane.
+- **SonarQube is not configured.** The job skips the upload without `SONAR_HOST_URL` and
+  `SONAR_TOKEN`.
+- **The pipelines' IAM user has `AdministratorAccess`.** A narrower policy for Terraform, and a
+  deploy-only key for the app projects, would follow least privilege more closely.
+- **RDS keeps 1 day of backups.** The account is on the paid plan now, so 7 days would be possible
+  (`backup_retention_period` in `infra/environments/*/main.tf`).
+- **No TLS**, because there is no domain.
+- **`scripts/verify_security.sh`** reports one false positive (secret names in
+  `infra/modules/compute/main.tf` read as a hardcoded credential).
 
 ---
 
-## What's already good
+## 4. Steps to submission
 
-- **Application code:** credentials must come from the environment (the apps refuse to start without
-  them), broker connections use TLS with certificate checks, and the billing consumer's ack/nack
-  handling is careful.
-- **Terraform:** shared modules give staging and production real parity, the security groups are tight
-  with explicit egress, and there are VPC flow logs and encrypted private RDS instances.
-- **Ansible:** the roles are cleanly structured, no secrets are committed, and the runner role checks
-  that registration actually took effect.
-
-Most of the remaining work is wiring and live setup, not new design.
+See `docs/AUDIT_READINESS_PLAN.md`.
 
 ---
 
-## Suggested order
+## How this update was done
 
-1. Fix the pipeline bugs (section 2, items 1-11) and the two confirmed infra bugs (section 3).
-2. Bring up a real GitLab instance and runner with the existing playbooks, then confirm runner
-   registration and branch protection work on that GitLab version.
-3. Split `infra/` and the three apps into their own repositories on that GitLab.
-4. Set up the AWS account and the Terraform state bucket, apply staging and production, and get one
-   green pipeline from commit to production.
-5. Last, update `README.md` and `docs/AUDIT_GUIDE.md` to match what actually ran.
-
----
-
-## How this review was done
-
-- **Read in full:** the CI files, Terraform, Ansible, application code, Dockerfiles, `README.md`,
-  `docs/readme.md`, `docs/audit.md` and `docs/AUDIT_READINESS_PLAN.md`.
-- **Skimmed:** `docs/AUDIT_GUIDE.md`, the three scripts in `scripts/`, the tests and `reports/`.
-- **Checked by running code:** the YAML problems were confirmed with a parsing script, and the Kaniko
-  `printf` line was run to confirm it produces invalid JSON.
-- **Not run:** the project's own scripts (they rewrite `reports/audit_report.json`). Terraform and
-  Ansible are not installed on the review machine.
-
-## Sources
-
-- [GitLab CI JSON schema (`ci.json`)](https://gitlab.com/gitlab-org/gitlab/-/raw/master/app/assets/javascripts/editor/schema/ci.json)
-- [GitLab: where variables can be used](https://docs.gitlab.com/ci/variables/where_variables_can_be_used/)
-- [GitLab epic 7437: allow default value for variables](https://gitlab.com/groups/gitlab-org/-/epics/7437)
-- [Docker forum: registry v2 spec and repository naming rule](https://forums.docker.com/t/docker-registry-v2-spec-and-repository-naming-rule/5466)
-- [Amazon MQ for RabbitMQ brokers](https://docs.aws.amazon.com/amazon-mq/latest/developer-guide/rabbitmq-basic-elements.html)
+- Each finding of the first review was checked against the current files and the commit that fixed
+  it.
+- The Ansible roles were run against the local GitLab 19.5 test instance, then every test object
+  was removed and the instance settings restored. Then they ran on the EC2 hosts, and the result
+  was checked in GitLab itself.
+- The four repositories were published to the EC2 GitLab and their pipelines run to production,
+  with the approvals done by hand in the GitLab UI.
+- The split pipelines were validated with GitLab's CI lint API; Terraform with `fmt`, `validate`;
+  the scripts with shellcheck; the roles with ansible-lint.

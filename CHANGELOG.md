@@ -648,3 +648,46 @@ The user asked Claude to run the playbook. The first real run found three proble
   - the runner is online.
 - The sign-in page answers 200 from this machine.
 - ansible-lint at the production profile: 0 failures.
+
+## 2026-10-21 21:11 EEST: publish script asks for the password itself
+
+**What**
+- `scripts/publish_repos.sh`:
+  - asks once for the GitLab password (or uses `GITLAB_PUSH_TOKEN`) and sends it to git in a header;
+  - unsets `GIT_ASKPASS` and `SSH_ASKPASS`, turns off git's terminal prompt and clears `credential.helper` for its pushes;
+  - checks access with `git ls-remote` before splitting, so a wrong password stops early with a clear message;
+  - the header comment and the `--help` range are updated to match.
+
+**Why**
+The first real publish failed with "HTTP Basic: Access denied". The terminal was a VS Code terminal whose `GIT_ASKPASS` helper was no longer connected, so git sent an empty password instead of prompting. Also, `credential.helper store` in `~/.gitconfig` would have saved the root password in plain text in `~/.git-credentials` after a successful push. No credentials were stored by the failed attempt.
+
+**Verified**
+- `bash -n` and shellcheck are clean.
+- These tests ran in a throwaway clone with a git shim that replaced every push with `git ls-remote`, so nothing was pushed:
+  - `--dry-run` does not prompt;
+  - with no terminal and no token, the script exits 1 with a message;
+  - a wrong password typed at the prompt, and a wrong `GITLAB_PUSH_TOKEN`, both stop at the access check;
+  - with the right password and the VS Code `GIT_ASKPASS` still set, all four splits match the earlier dry run (`c8ec62c`, `0758a5c`, `ae7b51d`, `85fb0af`) and all four projects are reachable;
+  - `~/.git-credentials` has no entry for the GitLab host.
+
+## 2026-10-21 22:05 EEST: first EC2 pipelines recorded, audit credential check fixed, drafts brought up to date
+
+**What**
+- `ansible/playbooks/deploy-runners.yml`: the runner summary now shows `Token=<redacted>` instead of `Token=<hidden>`.
+- `README.md` and `drafts/AUDIT_GUIDE.md`: the masked `gitlab-runner list` demo uses the same `<redacted>` placeholder.
+- `scripts/audit_orchestrator.sh`: the live hint for the runner (`RUNNER-LIVE-LIST`) masks the token the same way, instead of suggesting the plain `gitlab-runner list`.
+- `reports/audit_report.json`, `reports/ansible_list_tasks.txt`: regenerated with the live checks on the EC2 hosts. Result: 84 pass, 0 fail, 0 blocked, 4 skipped (checkov, hadolint, tflint, tfsec not installed).
+- `drafts/AUDIT_READINESS_PLAN.md`: rewritten with what is done and the steps left (docs into place and commit, the crud-master claim, rehearsal, costs, optional items, teardown).
+- `drafts/READINESS_REVIEW.md`: verdict and statuses updated (GitLab on EC2 and the repository split done, commit references instead of "uncommitted"), evidence for the EC2 install and the four pipelines added.
+- `drafts/AWS_SETUP.md` step 9: the publish script asks for the password itself; how to pass it from the env file; publishing all four at once when the environments are up.
+- `Results.md`: header, summary and cost; the GitLab on EC2 table; the four EC2 pipelines; next steps and status table; the two fixes; the crud-master check added to the open items.
+
+**Why**
+The four repositories were published to the EC2 GitLab, and their first pipelines (`infra` #1, `api-gateway` #2, `inventory-app` #3, `billing-app` #4) passed every job, including the production approvals done by the user. The first audit rerun then failed one control: its credential grep read the `Token=<hidden>` redaction pattern as a credential. The audit already treats "redact" as a documented non-secret, so the placeholder was renamed rather than the check weakened.
+
+**Verified**
+- All 49 jobs in the four pipelines succeeded.
+- Both infra plans said "No changes", and the production apply said "0 added, 0 changed, 0 destroyed".
+- Staging and production run `api-gateway:0758a5c5`, `inventory-app:ae7b51da` and `billing-app:85fb0afa`, with 2 of 2 tasks each. `/health`, `/api/movies` and `/docs` answer 200 through both ALBs.
+- The new audit hint, run on the runner host, prints `Token=<redacted>` and no `glrt-` value.
+- shellcheck is clean on the audit script, and `ansible-playbook --syntax-check` passes on the playbook.
