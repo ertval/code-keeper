@@ -173,6 +173,8 @@ code-keeper/
 │       └── tests/                    pytest suites
 ├── scripts/
 │   ├── publish_repos.sh              pushes each folder to its own GitLab project
+│   ├── stop_aws.sh                   stops the AWS charges between sessions, keeps GitLab
+│   ├── restart_aws.sh                brings GitLab and both environments back
 │   ├── test_pipelines.sh             structure, pipelines, scripts, Dockerfiles, unit tests
 │   ├── verify_security.sh            the four cybersecurity guidelines, checked in code
 │   └── audit_orchestrator.sh         every audit question mapped to automated checks
@@ -305,7 +307,8 @@ curl "http://${ALB}/api/movies"
    stable.
 
 **Redeploy everything** (for example before a demo): in each project, Build > Pipelines > Run
-pipeline on `main`, then run the approvals. Run infra first.
+pipeline on `main`, then run the approvals. Run infra first. `scripts/restart_aws.sh` does the same
+from the command line, approvals included (section 11).
 
 **Add a team member**: add them to `gitlab_team_members` in `ansible/roles/gitlab/defaults/main.yml`
 (or in the inventory) and run `ansible-playbook playbooks/deploy-gitlab.yml`. The account gets a
@@ -511,12 +514,23 @@ On-demand prices in us-east-1, roughly:
 | Staging and production together (Fargate, 4 RDS, 2 brokers, 2 NAT gateways, 2 ALBs) | about $0.79 an hour |
 | GitLab hosts (`t3.large` + `t3.medium`, disks, 2 public IPs) | about $0.14 an hour |
 
-When you are done, tear down in this order (the state bucket and lock table can stay):
+**Between sessions**, stop the hourly charges but keep GitLab:
 
 ```bash
-# each environment, production first (with the same -backend-config flags as in step 2)
-cd infra/environments/production && terraform init -backend-config=backend.hcl ... && terraform destroy
-cd ../staging && terraform init -backend-config=backend.hcl ... && terraform destroy
+scripts/stop_aws.sh      # destroys production, then staging, and stops the GitLab hosts (about 30 minutes)
+scripts/restart_aws.sh   # starts the hosts and runs the four pipelines with their approvals (about an hour)
+```
+
+While stopped, only the hosts' disks and public IPs are billed, about $0.45 a day. GitLab keeps its
+address, projects, history, variables and runner. `scripts/stop_aws.sh --dry-run` shows what is
+running without changing anything; `scripts/restart_aws.sh --hosts-only` starts only GitLab and the
+runner, and `--check` tests that a restart would work.
+
+**When you are done**, remove everything in this order (the state bucket and lock table can stay):
+
+```bash
+# both environments, production first; the script turns off the load balancers' deletion protection
+scripts/stop_aws.sh
 # the GitLab hosts
 terraform -chdir=ansible/terraform destroy -var 'admin_cidrs=["<your public IP>/32"]'
 ```

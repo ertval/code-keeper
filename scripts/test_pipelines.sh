@@ -242,6 +242,8 @@ SCRIPTS=(
   "scripts/test_pipelines.sh"
   "scripts/verify_security.sh"
   "scripts/publish_repos.sh"
+  "scripts/stop_aws.sh"
+  "scripts/restart_aws.sh"
 )
 for script in "${SCRIPTS[@]}"; do
   if [ -f "$script" ]; then

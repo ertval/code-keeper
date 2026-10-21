@@ -711,3 +711,67 @@ The user's run of `scripts/audit_orchestrator.sh` after commit `6087ae8` hung at
 
 **Why**
 The user confirmed that `srcs/` is the team's own code, so the "yes" in `docs/AUDIT_GUIDE.md` section 10.2 (the bonus question at `docs/audit.md:122`) is correct as written. `docs/AUDIT_READINESS_PLAN.md` step 2 still asks for the confirmation; the `docs` folder is read-only, so the user was given the text to update it.
+
+## 2026-10-21 23:01 EEST: full audit session guide drafted
+
+**What**
+- `drafts/AUDIT_GUIDE.md` (new; `drafts/` is git-ignored): a full replacement for `docs/AUDIT_GUIDE.md`. It walks through every question of `docs/audit.md`, in order, each with what to show, the expected output, what to say, and the follow-up questions with answers. Also:
+  - preparation: the day before, one hour before, what to have open, the running order with measured pipeline times, and what never to show on screen;
+  - two tested live demos: the OpenAPI title and version in `api-gateway`, and the log retention in `infra`;
+  - a zero-downtime probe, an end-to-end test, the teardown steps, a quick reference and a troubleshooting table.
+  - It keeps the section numbers other files refer to (2.2, 8.5, 10.2).
+
+**Why**
+The user asked for a full guide on what to do during the audit for each question. `docs/` is read-only, so the guide is a draft for the user to copy over `docs/AUDIT_GUIDE.md`.
+
+**Verified**
+Every command and expected output was checked against the live system:
+- the GitLab settings, runner and job logs via `gitlab-rails`;
+- the ECS, RDS, MQ, ALB and CloudWatch state via the AWS CLI;
+- `--list-tasks`, `gitlab-ctl status`, `gitlab-runner verify` and the masked `gitlab-runner list`;
+- `scripts/test_pipelines.sh` (89 passed) and `scripts/verify_security.sh` (78 passed, the known false positive).
+
+The demo changes were checked before the guide was written:
+- the infra change passes `terraform fmt` and the Trivy IaC gate on a scratch copy.
+
+The guide itself:
+- passes the audit script's `DOC-GUIDE` heading rules and its question coverage check (22 of 22);
+- has no em or en dashes, and gitleaks finds nothing in it.
+
+Found while checking, and recorded in the guide:
+- no pipeline schedules and no team accounts exist yet;
+- `verify_security.sh` still ends red on its one false positive;
+- the environment URLs in GitLab are placeholders;
+- the ALBs have deletion protection, which `docs/AWS_SETUP.md` step 13 does not mention.
+
+## 2026-10-21 23:55 EEST: stop and restart scripts for the AWS environments
+
+**What**
+- `scripts/stop_aws.sh`: created. Destroys production, then staging, with Terraform (it turns off
+  each load balancer's deletion protection first), then stops the GitLab and runner hosts and
+  lists what is still billed. Their disks and Elastic IPs stay, so GitLab keeps its address and
+  data. Asks for confirmation; `--yes` and `--dry-run`.
+- `scripts/restart_aws.sh`: created. Starts the hosts, waits for GitLab, makes a one-day root API
+  token over SSH with gitlab-rails (revoked when the script ends), waits for the runner, runs the
+  infra pipeline and gives its production approval, starts the three app pipelines once staging
+  is applied, gives their approvals once production is applied, then checks /health, /api/movies
+  and /docs on both load balancers. `--hosts-only` and `--check`.
+- `scripts/test_pipelines.sh`: the syntax check now covers both new scripts.
+- `README.md`: the scripts in the directory tree, a "Between sessions" part in section 11, and
+  the teardown now uses `scripts/stop_aws.sh`, because the old commands failed on the load
+  balancers' deletion protection.
+
+**Why**
+The user asked for one script that stops the charges and one that brings everything back for
+the audit. NAT gateways, load balancers, RDS and Amazon MQ cannot be paused, so the environments
+are destroyed and re-created by their own pipelines; GitLab is only stopped, which leaves about
+$0.45 a day for its disks and public IPs.
+
+**Verified**
+`scripts/stop_aws.sh --dry-run` against the live account: 62 resources to destroy in each
+environment, both hosts would stop, nothing changed. The token code ran on the local GitLab
+19.5.0 (token made, admin and runner checks passed, 401 after the revoke). The pipeline and
+approval loop ran against a throwaway local group with the same job names; all four pipelines
+passed and the app approvals waited for infra production. The group was deleted afterwards.
+shellcheck clean; `scripts/test_pipelines.sh` 0 failed. Not run: a real destroy or restart, and
+the SSH token step on the EC2 GitLab (the session's safety check blocked it).
