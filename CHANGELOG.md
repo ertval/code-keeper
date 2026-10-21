@@ -415,3 +415,32 @@ approvals can never open.
   - a second fresh checkout reads the restored plan after `terraform init`, as an apply job
     would, using `terraform show` instead of `apply`
 - The state bucket and lock table were empty afterwards. Nothing was applied.
+
+## 2026-10-21 01:56 EEST: RDS backups set to 1 day for the AWS Free plan
+
+**What**
+- `infra/environments/staging/main.tf` and `infra/environments/production/main.tf`:
+  `backup_retention_period` changed from 7 to 1, with a comment above the `rds` module saying why.
+- `infra/modules/rds/variables.tf`: the `backup_retention_period` default changed from 7 to 1,
+  and the description now gives the Free plan limit.
+
+**Why**
+Pipeline 11 (`7a9611c`) was the first real apply. `infra:apply:staging` created 56 of the 62
+staging resources, then both RDS instances failed with "FreeTierRestrictionError: The specified
+backup retention period exceeds the maximum available to free tier customers". AWS does not
+document the limit, so it was probed with CreateDBInstance calls that name a subnet group that
+does not exist. The Free plan check runs first, so nothing can be created: 7 and 2 were refused,
+and 1 and 0 passed. 1 keeps automated backups on. Staging stays partly up, and billing, until the
+next apply completes it or it is destroyed.
+
+**Verified**
+- `terraform fmt -check -recursive` passes. The first version put the comment inside the
+  module block, which broke the `=` alignment and would have failed `infra:validate:syntax`, so
+  the comment was moved above the block.
+- `terraform validate` passes for both environments.
+- `trivy config --severity HIGH,CRITICAL` exits 0.
+- `describe-orderable-db-instance-options`: db.t3.micro on PostgreSQL 15 supports storage
+  encryption and Performance Insights.
+- Plan against the real staging state, with placeholder secrets: creates the 2 RDS instances and
+  the inventory and billing task definitions and services, changes nothing else, and replaces
+  only the 4 secret versions, because the placeholders differ from the real values.

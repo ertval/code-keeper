@@ -32,9 +32,9 @@ variable "multi_az" {
 }
 
 variable "backup_retention_period" {
-  description = "Backup retention period in days"
+  description = "Backup retention period in days (the AWS Free plan allows at most 1)"
   type        = number
-  default     = 7
+  default     = 1
 }
 
 variable "inventory_db_name" {

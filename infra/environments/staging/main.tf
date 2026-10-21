@@ -51,6 +51,8 @@ module "security_groups" {
   vpc_cidr    = var.cidr_block
 }
 
+# RDS keeps 1 day of backups: the AWS Free plan refuses CreateDBInstance with more
+# (FreeTierRestrictionError); paid plans allow up to 35.
 module "rds" {
   source                  = "../../modules/rds"
   environment             = var.environment
@@ -59,7 +61,7 @@ module "rds" {
   instance_class          = "db.t3.micro"
   allocated_storage       = 20
   multi_az                = false
-  backup_retention_period = 7
+  backup_retention_period = 1
   inventory_db_password   = var.inventory_db_password
   billing_db_password     = var.billing_db_password
 }

@@ -55,6 +55,9 @@ module "security_groups" {
 # credits. The high-availability sizes were: RDS db.t3.small with 50 GB, Multi-AZ
 # and 30-day backups; Amazon MQ mq.m5.large as CLUSTER_MULTI_AZ (on RabbitMQ 4.2
 # that needs an mq.m7g type); 4 replicas per service with 512 CPU units and 1024 MB.
+#
+# RDS keeps 1 day of backups: the AWS Free plan refuses CreateDBInstance with more
+# (FreeTierRestrictionError); paid plans allow up to 35.
 module "rds" {
   source                  = "../../modules/rds"
   environment             = var.environment
@@ -63,7 +66,7 @@ module "rds" {
   instance_class          = "db.t3.micro"
   allocated_storage       = 20
   multi_az                = false
-  backup_retention_period = 7
+  backup_retention_period = 1
   inventory_db_password   = var.inventory_db_password
   billing_db_password     = var.billing_db_password
 }
