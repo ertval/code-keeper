@@ -703,3 +703,11 @@ The user's run of `scripts/audit_orchestrator.sh` after commit `6087ae8` hung at
 **Verified**
 - In a pseudo-terminal, `timeout 120 /tmp/ck-bin/ansible-playbook ... --syntax-check` finishes with rc 0.
 - Piping YAML into `/tmp/ck-bin/yamllint -` still works, so `-i` is still passed when stdin is a pipe.
+
+## 2026-10-21 22:37 EEST: crud-master provenance confirmed
+
+**What**
+- `Results.md`: the "confirm the crud-master claim" item is removed from "Still open", and a line records that the team confirmed `srcs/` is its own crud-master code.
+
+**Why**
+The user confirmed that `srcs/` is the team's own code, so the "yes" in `docs/AUDIT_GUIDE.md` section 10.2 (the bonus question at `docs/audit.md:122`) is correct as written. `docs/AUDIT_READINESS_PLAN.md` step 2 still asks for the confirmation; the `docs` folder is read-only, so the user was given the text to update it.

@@ -149,6 +149,8 @@ What changed for each:
   - The playbook summary printed the runner token from `gitlab-runner list`. That token was reset,
     and the summary, the README demo and the audit script's hint now show `Token=<redacted>`.
   - `scripts/publish_repos.sh` asks for the GitLab password itself (see above).
+- **crud-master bonus.** The team confirmed on 2026-10-21 that `srcs/` is its own crud-master code,
+  so the answer in `docs/AUDIT_GUIDE.md` section 10.2 stands.
 
 Still open (the code items are also in section 12 of `README.md`):
 
@@ -163,5 +165,3 @@ Still open (the code items are also in section 12 of `README.md`):
 - The Trivy, Gitleaks, SonarQube and AWS CLI images use `:latest`.
 - SonarQube is not configured, so the SonarQube jobs pass without uploading anything.
 - The pipelines' IAM user has `AdministratorAccess`.
-- `docs/AUDIT_GUIDE.md` section 10.2 says `srcs/` is the team's own crud-master code; confirm that
-  before the audit.
