@@ -475,3 +475,30 @@ next apply completes it or it is destroyed.
   `docker.io/sntentop/api-gateway:7d773527`.
 - GitLab CI Lint on the merged config: valid, 0 errors. Rules simulator: 9 of 9.
   `scripts/test_pipelines.sh` on a copy: all passed.
+
+## 2026-10-21 11:04 EEST: Both environments deployed; Results.md brought up to date
+
+**What**
+- `Results.md`: rewritten for the current state:
+  - what is live in staging and production, and the end-to-end check results
+  - pipelines 10 to 14, with the cause and fix of each failure
+  - the setup that is done, and next steps (testing, teardown, redeploying before the audit)
+  - what the audit still needs, and the smaller points, including the Free plan limits that
+    `docs/AWS_SETUP.md` should mention
+
+**Why**
+Pipeline 14 (`5d9f578`, started from the API so it runs every job) passed every job. The user
+had upgraded the AWS account to the paid plan after pipeline 12's production apply failed with
+`InstanceQuotaExceeded`. The Free plan allows 2 RDS instances, and staging used both. The
+pipeline was started from the API because an app-only push has no infra jobs. On the user's
+request, Claude started `infra:approval:production` and the three app approvals through the
+GitLab API.
+
+**Verified**
+- Both environments: `/health` returns `{"status":"healthy"}`, and all 6 ECS services run 2 of 2
+  tasks.
+- Movie create, read and delete through each load balancer: `HTTP 200`. The test movies were
+  deleted.
+- `POST /api/billing`: each environment's billing worker logged the order as recorded, over AMQPS
+  on port 5671.
+- AWS credits: $92.02, paid plan.
