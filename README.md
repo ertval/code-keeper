@@ -493,7 +493,7 @@ sudo gitlab-rake gitlab:env:info
 
 ```bash
 systemctl status gitlab-runner
-sudo gitlab-runner list
+sudo gitlab-runner list 2>&1 | sed -E 's/(Token[^=]*=)[^ ]+/\1<hidden>/'    # hides the runner token
 sudo gitlab-runner verify
 ```
 

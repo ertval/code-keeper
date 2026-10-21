@@ -27,6 +27,8 @@
       ansible.builtin.command: gitlab-runner list
       register: runner_status
       changed_when: false
+      # The output contains the runner's authentication token; the summary below hides it.
+      no_log: true
 
     - name: Verify GitLab Runner systemd daemon status
       ansible.builtin.systemd:
@@ -38,4 +40,7 @@
       ansible.builtin.debug:
         msg:
           - "GitLab Runner service active: {{ runner_service.status.ActiveState | default('active') }}"
-          - "Registered runners: {{ runner_status.stderr_lines + runner_status.stdout_lines }}"
+          - >-
+            Registered runners: {{ (runner_status.stderr_lines + runner_status.stdout_lines)
+            | map('regex_replace', '\x1b\[[0-9;]*m', '')
+            | map('regex_replace', 'Token=\S+', 'Token=<hidden>') | list }}

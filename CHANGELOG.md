@@ -583,3 +583,68 @@ the docs against the code.
   - `scripts/audit_orchestrator.sh`: 81 pass, 0 fail, 3 blocked until GitLab runs on EC2.
   - shellcheck clean.
 - Not tested yet: the package install on a fresh EC2 host.
+
+## 2026-10-21 15:19 EEST: Private variables file for the Ansible run
+
+**What**
+- `~/.config/code-keeper.env` (outside the repository, mode 600): created, with
+  `GITLAB_ROOT_PASSWORD` (newly generated, the root login of the EC2 GitLab) and the 11 `CK_*`
+  values that `ansible/roles/gitlab/tasks/variables.yml` turns into GitLab CI/CD variables.
+
+**Why**
+The user ran `terraform apply` in `ansible/terraform` (GitLab at 23.21.56.248, runner at
+54.82.149.95) and asked for the next step, which is `docs/AWS_SETUP.md` step 8.2. The values were
+copied from the local test GitLab project `root/code-keeper`, which already ran pipeline 14 with
+them, so nothing was typed by hand or shown in the terminal.
+
+**Verified**
+- The three Terraform passwords match the separate copy in
+  `~/.config/code-keeper-local-gitlab/aws-tf-passwords.env`.
+- The file parses in bash.
+- `ansible all -m ping` reaches both hosts.
+- `ansible-playbook playbooks/site.yml --syntax-check` passes with the local ansible-core 2.19.0.
+
+- The 11 CK_* values, copied from the local GitLab project that ran the green pipeline 14. Nothing was printed. The three database and RabbitMQ passwords match your other saved copy.
+- GITLAB_ROOT_PASSWORD, newly generated. It's the root login for the new GitLab. To see it: grep GITLAB_ROOT ~/.config/code-keeper.env.
+
+## 2026-10-21 16:43 EEST: GitLab and the runner installed on EC2 with Ansible; three fixes from the first real run
+
+**What**
+- On the EC2 hosts:
+  - GitLab CE 19.5.0 is installed and configured at http://23.21.56.248, with the group
+    `code-keeper`, its 4 projects and the 11 CI/CD variables.
+  - The runner `docker-shared-runner-01` on 54.82.149.95 is installed, registered and online.
+- `ansible.cfg` and `ansible/ansible.cfg`: new `[ssh_connection]` with
+  `ServerAliveInterval=30`.
+- `ansible/playbooks/deploy-runners.yml`: the `gitlab-runner list` result is `no_log`, and the
+  summary prints it with the token replaced by `<hidden>`.
+- `ansible/roles/gitlab/tasks/variables.yml`: each variable is read first. It is updated only when
+  its value or flags differ and created when missing.
+- `README.md`, `drafts/AUDIT_GUIDE.md`, `drafts/AUDIT_READINESS_PLAN.md`: the
+  `gitlab-runner list` demo pipes through `sed` to hide the token.
+
+**Why**
+The user asked Claude to run the playbook. The first real run found three problems:
+- **The run hung.** The GitLab package install sends nothing for about 15 minutes, and the
+  user's router dropped the idle SSH connection. The host finished, with the result stuck in its
+  send queue, but Ansible waited forever. The hung run was stopped and rerun.
+- **The runner token leaked.** The runner summary printed `gitlab-runner list`, which includes
+  the full runner token, into the run log. That token was reset through the GitLab API (the old
+  one now gets 403), the log was deleted, and the playbook registered a new token, which it no
+  longer prints.
+- **Reruns were not idempotent.** The variables task reported all 11 variables as changed on
+  every run.
+
+**Verified**
+- Five runs. The last two changed only the two one-day API tokens, with 0 changes on the runner
+  host and no token in the output.
+- The invalid-token path works on the real hosts: the token was detected as invalid, reset,
+  written and verified.
+- Checked inside GitLab Rails:
+  - the root password from `~/.config/code-keeper.env` works;
+  - sign-up is disabled and `main` is protected (push and merge 40, no force push);
+  - the group is private, with 5 variables, and `infra` has 6;
+  - all projects require green pipelines;
+  - the runner is online.
+- The sign-in page answers 200 from this machine.
+- ansible-lint at the production profile: 0 failures.

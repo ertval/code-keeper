@@ -3,8 +3,8 @@
 # of variable KEY is read from CK_KEY, and keys whose CK_ value is empty are skipped,
 # so this can run before the secrets exist and again once they do. Values are never
 # written to disk or printed. raw=true stops GitLab from expanding "$" in them.
-# Each variable is updated in place (PUT) and created (POST) when the update
-# answers 404.
+# Each variable is read first: it is updated (PUT) only when its value or flags
+# differ, and created (POST) when it does not exist, so a rerun reports no change.
 
 - name: Collect the group variable values from CK_<key>
   ansible.builtin.set_fact:
@@ -36,22 +36,37 @@
       - "Skipped (no CK_ value): {{ ((gitlab_group_variables + gitlab_project_variables) | map(attribute='key') | list)
           | difference(((gitlab_group_variables_to_set | default([])) + (gitlab_project_variables_to_set | default([]))) | map(attribute='key') | list) }}"
 
-- name: Update the group variables
+- name: Read the current group variables
   ansible.builtin.uri:
     url: "{{ gitlab_local_api_url }}/groups/{{ gitlab_group_id }}/variables/{{ item.key }}"
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_api_token_value }}"
+    status_code: [200, 404]
+  loop: "{{ gitlab_group_variables_to_set | default([]) }}"
+  register: gitlab_group_variable_current
+  no_log: true
+
+- name: Update the group variables whose value or flags differ
+  ansible.builtin.uri:
+    url: "{{ gitlab_local_api_url }}/groups/{{ gitlab_group_id }}/variables/{{ item.item.key }}"
     method: PUT
     headers:
       PRIVATE-TOKEN: "{{ gitlab_api_token_value }}"
     body_format: json
     body:
-      value: "{{ item.value }}"
-      masked: "{{ item.masked | bool }}"
-      protected: "{{ item.protected | bool }}"
+      value: "{{ item.item.value }}"
+      masked: "{{ item.item.masked | bool }}"
+      protected: "{{ item.item.protected | bool }}"
       raw: true
-    status_code: [200, 404]
-  loop: "{{ gitlab_group_variables_to_set | default([]) }}"
-  register: gitlab_group_variable_update
-  changed_when: gitlab_group_variable_update.status == 200
+    status_code: [200]
+  loop: "{{ gitlab_group_variable_current.results | default([]) }}"
+  when: >-
+    item.status == 200 and
+    (item.json.value != item.item.value
+     or item.json.masked != (item.item.masked | bool)
+     or item.json.protected != (item.item.protected | bool)
+     or not item.json.raw)
+  changed_when: true
   no_log: true
 
 - name: Create the group variables that did not exist yet
@@ -68,32 +83,53 @@
       protected: "{{ item.item.protected | bool }}"
       raw: true
     status_code: [201]
-  loop: "{{ gitlab_group_variable_update.results | default([]) }}"
+  loop: "{{ gitlab_group_variable_current.results | default([]) }}"
   when: item.status == 404
   changed_when: true
   no_log: true
 
-- name: Update the project variables
+- name: Read the current project variables
+  vars:
+    gitlab_project_api: "{{ gitlab_local_api_url }}/projects/{{ (gitlab_group_path ~ '/' ~ item.project) | urlencode | replace('/', '%2F') }}"
   ansible.builtin.uri:
-    url: "{{ gitlab_local_api_url }}/projects/{{ (gitlab_group_path ~ '/' ~ item.project) | urlencode | replace('/', '%2F') }}/variables/{{ item.key }}"
+    url: "{{ gitlab_project_api }}/variables/{{ item.key }}"
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_api_token_value }}"
+    status_code: [200, 404]
+  loop: "{{ gitlab_project_variables_to_set | default([]) }}"
+  register: gitlab_project_variable_current
+  no_log: true
+
+- name: Update the project variables whose value or flags differ
+  vars:
+    gitlab_project_api: "{{ gitlab_local_api_url }}/projects/{{ (gitlab_group_path ~ '/' ~ item.item.project) | urlencode | replace('/', '%2F') }}"
+  ansible.builtin.uri:
+    url: "{{ gitlab_project_api }}/variables/{{ item.item.key }}"
     method: PUT
     headers:
       PRIVATE-TOKEN: "{{ gitlab_api_token_value }}"
     body_format: json
     body:
-      value: "{{ item.value }}"
-      masked: "{{ item.masked | bool }}"
-      protected: "{{ item.protected | bool }}"
+      value: "{{ item.item.value }}"
+      masked: "{{ item.item.masked | bool }}"
+      protected: "{{ item.item.protected | bool }}"
       raw: true
-    status_code: [200, 404]
-  loop: "{{ gitlab_project_variables_to_set | default([]) }}"
-  register: gitlab_project_variable_update
-  changed_when: gitlab_project_variable_update.status == 200
+    status_code: [200]
+  loop: "{{ gitlab_project_variable_current.results | default([]) }}"
+  when: >-
+    item.status == 200 and
+    (item.json.value != item.item.value
+     or item.json.masked != (item.item.masked | bool)
+     or item.json.protected != (item.item.protected | bool)
+     or not item.json.raw)
+  changed_when: true
   no_log: true
 
 - name: Create the project variables that did not exist yet
+  vars:
+    gitlab_project_api: "{{ gitlab_local_api_url }}/projects/{{ (gitlab_group_path ~ '/' ~ item.item.project) | urlencode | replace('/', '%2F') }}"
   ansible.builtin.uri:
-    url: "{{ gitlab_local_api_url }}/projects/{{ (gitlab_group_path ~ '/' ~ item.item.project) | urlencode | replace('/', '%2F') }}/variables"
+    url: "{{ gitlab_project_api }}/variables"
     method: POST
     headers:
       PRIVATE-TOKEN: "{{ gitlab_api_token_value }}"
@@ -105,7 +141,7 @@
       protected: "{{ item.item.protected | bool }}"
       raw: true
     status_code: [201]
-  loop: "{{ gitlab_project_variable_update.results | default([]) }}"
+  loop: "{{ gitlab_project_variable_current.results | default([]) }}"
   when: item.status == 404
   changed_when: true
   no_log: true
