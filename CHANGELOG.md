@@ -444,3 +444,34 @@ next apply completes it or it is destroyed.
 - Plan against the real staging state, with placeholder secrets: creates the 2 RDS instances and
   the inventory and billing task definitions and services, changes nothing else, and replaces
   only the 4 secret versions, because the placeholders differ from the real values.
+
+## 2026-10-21 09:35 EEST: Deploy jobs install tar, promote jobs use a crane image that exists
+
+**What**
+- `srcs/{api-gateway,inventory-app,billing-app}/.gitlab-ci.yml`:
+  - `deploy:staging` and `deploy:production` install `tar` and `gzip` with `jq` (6 jobs).
+  - `promote:image` uses `gcr.io/go-containerregistry/crane:debug`, pinned by digest, instead of
+    `crane:0.20.2` (3 jobs).
+
+**Why**
+- In pipeline 12 (`7d77352`), all three `deploy:staging` jobs failed with "tar: command not
+  found". `amazon/aws-cli:latest` has neither `tar` nor `gzip`, and the crane download is a
+  `.tar.gz`. Their production approvals were skipped as a result.
+- `promote:image` has never run. `crane:0.20.2` does not exist ("not found"), and the published
+  plain tags (`v0.20.3` to `v0.22.1`) have no shell, which GitLab needs. Only the moving `debug`
+  tag has one, so it is pinned by digest.
+- Not changed: `terraform.tfvars` sets `release_tag` to `staging-latest` / `production-latest`,
+  and tfvars take priority over the CI's `TF_VAR_release_tag`. Terraform therefore seeds task
+  definitions with tags that do not exist yet, and staging runs 0 of 2 tasks per service until
+  `deploy:staging` registers the commit tag. That is how the design works, so it was left
+  alone.
+
+**Verified**
+- The fixed install line in `amazon/aws-cli:latest` installs `tar` and `gzip`, then crane 0.20.2.
+  The same container's read-only steps against real staging work: describing the task
+  definition and preparing the patched one, with `repositoryCredentials` kept. Nothing was
+  registered or updated.
+- The pinned crane `debug` image has `sh`, `printf`, `mkdir` and `crane`, and resolves
+  `docker.io/sntentop/api-gateway:7d773527`.
+- GitLab CI Lint on the merged config: valid, 0 errors. Rules simulator: 9 of 9.
+  `scripts/test_pipelines.sh` on a copy: all passed.

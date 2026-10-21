@@ -462,7 +462,8 @@ billing-app:deploy:staging:
   - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
   - cd "${APP_DIR}"
   - pwd
-  - command -v jq >/dev/null 2>&1 || (yum install -y -q jq || microdnf install -y -q jq)
+  # amazon/aws-cli has no tar or gzip, and the crane download below needs both.
+  - command -v jq >/dev/null 2>&1 && command -v tar >/dev/null 2>&1 || (yum install -y -q jq tar gzip || microdnf install -y -q jq tar gzip)
   - command -v crane >/dev/null 2>&1 || (curl -fsSL https://github.com/google/go-containerregistry/releases/download/v0.20.2/go-containerregistry_Linux_x86_64.tar.gz | tar xz -C /usr/local/bin crane)
   script:
   - echo "=== [CD] Deploying ${APP_NAME} to Staging Environment ==="
@@ -543,7 +544,10 @@ billing-app:approval:production:
 billing-app:promote:image:
   stage: Deploy to Production
   image:
-    name: gcr.io/go-containerregistry/crane:0.20.2
+    # crane:0.20.2 does not exist, and the plain crane images have no shell, which
+    # GitLab needs to run the script. The debug variant has a busybox shell; it is
+    # a moving tag, so it is pinned by digest.
+    name: gcr.io/go-containerregistry/crane:debug@sha256:e78770b31258a3846f878036d9c1f63fbe4c871f9f56990bf77fd95c013e3c1b
     entrypoint: [""]
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule"
@@ -616,7 +620,8 @@ billing-app:deploy:production:
   - 'echo "=== [CI] ${APP_NAME} : working from service directory ${APP_DIR} ==="'
   - cd "${APP_DIR}"
   - pwd
-  - command -v jq >/dev/null 2>&1 || (yum install -y -q jq || microdnf install -y -q jq)
+  # amazon/aws-cli has no tar or gzip, and the crane download below needs both.
+  - command -v jq >/dev/null 2>&1 && command -v tar >/dev/null 2>&1 || (yum install -y -q jq tar gzip || microdnf install -y -q jq tar gzip)
   - command -v crane >/dev/null 2>&1 || (curl -fsSL https://github.com/google/go-containerregistry/releases/download/v0.20.2/go-containerregistry_Linux_x86_64.tar.gz | tar xz -C /usr/local/bin crane)
   script:
   - echo "=== [CD] Executing Zero-Downtime Rolling Deployment to Production ==="
