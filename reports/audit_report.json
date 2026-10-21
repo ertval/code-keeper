@@ -1,13 +1,13 @@
 {
   "schema": "code-keeper/audit-orchestrator/1",
-  "generated_at": "2026-10-21T22:04:59+0300",
+  "generated_at": "2026-10-21T22:32:04+0300",
   "generator": "scripts/audit_orchestrator.sh",
   "shell_options": "set -uo pipefail; `set -e` is deliberately omitted so a failing control is recorded as a verdict instead of aborting the audit walk",
   "repo": {
     "root": "/home/steven/Desktop/code-keeper",
-    "commit": "c0c321385f00b073ecb3b858d51275385e4377ef",
+    "commit": "4b21cad6f9b9d2bb1d1c7951173fbeb161c58112",
     "branch": "main",
-    "dirty": true
+    "dirty": false
   },
   "options": {
     "only": null,
@@ -952,7 +952,7 @@
       "id": "FUNC-PYTEST/api-gateway",
       "label": "Unit suites run green through uv + pytest-cov",
       "verdict": "PASS",
-      "evidence": "uv run pytest: 7 passed in 1.08s",
+      "evidence": "uv run pytest: 7 passed in 1.33s",
       "advisory": false,
       "evidence_log": "reports/evidence/FUNC-PYTEST.log",
       "audit_question": {
@@ -967,7 +967,7 @@
       "id": "FUNC-PYTEST/billing-app",
       "label": "Unit suites run green through uv + pytest-cov",
       "verdict": "PASS",
-      "evidence": "uv run pytest: 32 passed in 2.26s",
+      "evidence": "uv run pytest: 32 passed in 2.37s",
       "advisory": false,
       "evidence_log": "reports/evidence/FUNC-PYTEST.log",
       "audit_question": {
@@ -982,7 +982,7 @@
       "id": "FUNC-PYTEST/inventory-app",
       "label": "Unit suites run green through uv + pytest-cov",
       "verdict": "PASS",
-      "evidence": "uv run pytest: 20 passed in 0.07s",
+      "evidence": "uv run pytest: 20 passed in 0.10s",
       "advisory": false,
       "evidence_log": "reports/evidence/FUNC-PYTEST.log",
       "audit_question": {
@@ -1342,7 +1342,7 @@
       "id": "CYB4-RENOVATE",
       "label": "Docs claim Renovate \u2014 is any Renovate automation wired up?",
       "verdict": "INFO",
-      "evidence": "3 document(s) mention Renovate but no renovate config/workflow exists \u2014 the claim is cosmetic (dependabot is the only automation running)",
+      "evidence": "2 document(s) mention Renovate but no renovate config/workflow exists \u2014 the claim is cosmetic (dependabot is the only automation running)",
       "advisory": false,
       "evidence_log": "reports/evidence/CYB4-RENOVATE.log",
       "audit_question": {
@@ -1387,7 +1387,7 @@
       "id": "DOC-GUIDE",
       "label": "docs/AUDIT_GUIDE.md substantive and covers every audit section",
       "verdict": "PASS",
-      "evidence": "docs/AUDIT_GUIDE.md: 138662 bytes covering all 11 audit areas incl. live demo commands",
+      "evidence": "docs/AUDIT_GUIDE.md: 33620 bytes covering all 11 audit areas incl. live demo commands",
       "advisory": false,
       "evidence_log": "reports/evidence/DOC-GUIDE.log",
       "audit_question": {
@@ -1402,7 +1402,7 @@
       "id": "DOC-DIAGRAMS",
       "label": "Audit guide + README carry diagrams (mermaid/ASCII)",
       "verdict": "PASS",
-      "evidence": "7 diagrams (guide: 0 mermaid + 5 ascii; README: 0 mermaid + 2 ascii)",
+      "evidence": "8 diagrams (guide: 2 mermaid + 4 ascii; README: 0 mermaid + 2 ascii)",
       "advisory": false,
       "evidence_log": "reports/evidence/DOC-DIAGRAMS.log",
       "audit_question": {
@@ -1784,7 +1784,7 @@
         "FUNC-SHELL",
         "FUNC-YAML"
       ],
-      "evidence": "uv run pytest: 7 passed in 1.08s"
+      "evidence": "uv run pytest: 7 passed in 1.33s"
     },
     {
       "id": "Q104",
