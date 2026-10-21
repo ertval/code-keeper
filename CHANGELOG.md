@@ -691,3 +691,15 @@ The four repositories were published to the EC2 GitLab, and their first pipeline
 - Staging and production run `api-gateway:0758a5c5`, `inventory-app:ae7b51da` and `billing-app:85fb0afa`, with 2 of 2 tasks each. `/health`, `/api/movies` and `/docs` answer 200 through both ALBs.
 - The new audit hint, run on the runner host, prints `Token=<redacted>` and no `glrt-` value.
 - shellcheck is clean on the audit script, and `ansible-playbook --syntax-check` passes on the playbook.
+
+## 2026-10-21 22:24 EEST: the local tool wrappers no longer hang in an interactive terminal
+
+**What**
+- `/tmp/ck-bin/*` (the seven local Docker wrappers for `ansible-playbook`, `ansible-lint`, `yamllint`, `terraform`, `trivy`, `gitleaks` and `shellcheck`; outside the repository): `docker run` gets `-i` only when stdin is not a terminal.
+
+**Why**
+The user's run of `scripts/audit_orchestrator.sh` after commit `6087ae8` hung at `ANSIBLE-SYNTAX`. The script runs tools under `timeout`, which puts them in their own process group. With `-i` and a terminal on stdin, `docker run` tried to read the terminal from the background and was stopped by SIGTTIN, which left the run waiting forever. Earlier runs had no terminal, so they never hit it. No repository file changed.
+
+**Verified**
+- In a pseudo-terminal, `timeout 120 /tmp/ck-bin/ansible-playbook ... --syntax-check` finishes with rc 0.
+- Piping YAML into `/tmp/ck-bin/yamllint -` still works, so `-i` is still passed when stdin is a pipe.
