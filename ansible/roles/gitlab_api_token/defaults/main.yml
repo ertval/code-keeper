@@ -1,0 +1,9 @@
+---
+# Defaults for role: gitlab_api_token
+# Name and scopes of the short-lived root token the API tasks use. Every run revokes
+# the previous token with this name and creates a new one that expires after a day,
+# so no long-lived admin token exists.
+gitlab_api_token_name: "ansible-automation"
+gitlab_api_token_scopes:
+  - api
+  - create_runner

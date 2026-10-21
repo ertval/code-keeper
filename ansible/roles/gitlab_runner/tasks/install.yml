@@ -20,7 +20,7 @@
 - name: Check if GitLab Runner repository is present
   ansible.builtin.stat:
     path: /etc/apt/sources.list.d/runner_gitlab-runner.list
-  register: runner_repo_file
+  register: gitlab_runner_repo_file
 
 - name: Download GitLab Runner repository setup script (no curl|bash pipe)
   ansible.builtin.get_url:
@@ -28,16 +28,18 @@
     dest: /tmp/gitlab-runner-repo-script.deb.sh
     mode: '0750'
     checksum: "{{ 'sha256:' + gitlab_runner_repo_script_sha256 if gitlab_runner_repo_script_sha256 | length > 0 else omit }}"
-  when: not runner_repo_file.stat.exists
+  when: not gitlab_runner_repo_file.stat.exists
 
 - name: Add official GitLab Runner APT repository via pinned setup script
   ansible.builtin.command: bash /tmp/gitlab-runner-repo-script.deb.sh
   args:
     creates: /etc/apt/sources.list.d/runner_gitlab-runner.list
-  when: not runner_repo_file.stat.exists
+  when: not gitlab_runner_repo_file.stat.exists
 
-- name: Install GitLab Runner package
+- name: Install GitLab Runner and its helper images at the same pinned version
   ansible.builtin.apt:
-    name: "{{ gitlab_runner_package }}{{ '=' + gitlab_runner_version if gitlab_runner_version else '' }}"
+    name:
+      - "gitlab-runner-helper-images{{ '=' + gitlab_runner_version if gitlab_runner_version else '' }}"
+      - "{{ gitlab_runner_package }}{{ '=' + gitlab_runner_version if gitlab_runner_version else '' }}"
     state: present
     update_cache: true

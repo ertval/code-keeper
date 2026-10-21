@@ -1,21 +1,11 @@
 ---
+# The concurrent setting now comes from config.toml.j2 (register.yml), so it is no
+# longer patched in with lineinfile.
 - name: Ensure gitlab-runner user is in docker group
   ansible.builtin.user:
     name: gitlab-runner
     groups: docker
     append: true
-  failed_when: false
-
-- name: Ensure concurrent jobs setting is updated in config.toml
-  ansible.builtin.lineinfile:
-    path: /etc/gitlab-runner/config.toml
-    regexp: '^concurrent\s*='
-    line: "concurrent = {{ gitlab_runner_concurrent }}"
-    state: present
-  when: not runner_registration.skipped | default(false)
-  failed_when: false
-  notify:
-    - Restart GitLab Runner
 
 - name: Ensure GitLab Runner service is started and enabled
   ansible.builtin.systemd:

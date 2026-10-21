@@ -1,0 +1,145 @@
+---
+# Group, projects and team members through the REST API. Each step looks the object
+# up first and only creates what is missing, so the play is safe to run again.
+
+- name: Look up the group {{ gitlab_group_path }}
+  ansible.builtin.uri:
+    url: "{{ gitlab_local_api_url }}/groups/{{ gitlab_group_path | urlencode }}"
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_api_token_value }}"
+    status_code: [200, 404]
+  register: gitlab_group_lookup
+  no_log: "{{ gitlab_api_no_log }}"
+
+- name: Create the group {{ gitlab_group_path }}
+  ansible.builtin.uri:
+    url: "{{ gitlab_local_api_url }}/groups"
+    method: POST
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_api_token_value }}"
+    body_format: json
+    body:
+      name: "{{ gitlab_group_name }}"
+      path: "{{ gitlab_group_path }}"
+      visibility: "{{ gitlab_group_visibility }}"
+      description: "code-keeper: infrastructure and the three microservices, one repository each"
+    status_code: [201]
+  register: gitlab_group_create
+  when: gitlab_group_lookup.status == 404
+  changed_when: true
+  no_log: "{{ gitlab_api_no_log }}"
+
+- name: Remember the group id
+  ansible.builtin.set_fact:
+    gitlab_group_id: "{{ (gitlab_group_create.json if gitlab_group_create is not skipped else gitlab_group_lookup.json).id }}"
+
+- name: Look up the projects
+  ansible.builtin.uri:
+    url: "{{ gitlab_local_api_url }}/projects/{{ (gitlab_group_path ~ '/' ~ item.path) | urlencode | replace('/', '%2F') }}"
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_api_token_value }}"
+    status_code: [200, 404]
+  loop: "{{ gitlab_projects }}"
+  loop_control:
+    label: "{{ gitlab_group_path }}/{{ item.path }}"
+  register: gitlab_project_lookup
+  no_log: "{{ gitlab_api_no_log }}"
+
+- name: Create the missing projects
+  ansible.builtin.uri:
+    url: "{{ gitlab_local_api_url }}/projects"
+    method: POST
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_api_token_value }}"
+    body_format: json
+    body:
+      name: "{{ item.item.path }}"
+      path: "{{ item.item.path }}"
+      namespace_id: "{{ gitlab_group_id | int }}"
+      description: "{{ item.item.description }}"
+      visibility: "{{ gitlab_group_visibility }}"
+      default_branch: "{{ gitlab_default_branch_name }}"
+    status_code: [201]
+  loop: "{{ gitlab_project_lookup.results }}"
+  loop_control:
+    label: "{{ gitlab_group_path }}/{{ item.item.path }}"
+  when: item.status == 404
+  changed_when: true
+  no_log: "{{ gitlab_api_no_log }}"
+
+# Applied to every project on every run, so the settings stay as declared here even
+# if someone changes them in the UI. Merge requests need a green pipeline, which is
+# what makes the CI pipeline a gate for code review.
+- name: Apply merge request and pipeline settings to each project
+  ansible.builtin.uri:
+    url: "{{ gitlab_local_api_url }}/projects/{{ (gitlab_group_path ~ '/' ~ item.path) | urlencode | replace('/', '%2F') }}"
+    method: PUT
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_api_token_value }}"
+    body_format: json
+    body:
+      description: "{{ item.description }}"
+      only_allow_merge_if_pipeline_succeeds: true
+      only_allow_merge_if_all_discussions_are_resolved: true
+      remove_source_branch_after_merge: true
+      auto_devops_enabled: false
+      shared_runners_enabled: "{{ gitlab_shared_runners_enabled | bool }}"
+      ci_config_path: ".gitlab-ci.yml"
+      build_timeout: 3600
+    status_code: [200]
+  loop: "{{ gitlab_projects }}"
+  loop_control:
+    label: "{{ gitlab_group_path }}/{{ item.path }}"
+  no_log: "{{ gitlab_api_no_log }}"
+
+- name: Look up the team members
+  ansible.builtin.uri:
+    url: "{{ gitlab_local_api_url }}/users?username={{ item.username | urlencode }}"
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_api_token_value }}"
+    status_code: [200]
+  loop: "{{ gitlab_team_members }}"
+  loop_control:
+    label: "{{ item.username }}"
+  register: gitlab_member_lookup
+  no_log: "{{ gitlab_api_no_log }}"
+
+- name: Create the missing team member accounts (random password, set by the admin)
+  ansible.builtin.uri:
+    url: "{{ gitlab_local_api_url }}/users"
+    method: POST
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_api_token_value }}"
+    body_format: json
+    body:
+      username: "{{ item.item.username }}"
+      name: "{{ item.item.name }}"
+      email: "{{ item.item.email }}"
+      force_random_password: true
+      skip_confirmation: true
+    status_code: [201]
+  loop: "{{ gitlab_member_lookup.results }}"
+  loop_control:
+    label: "{{ item.item.username }}"
+  when: item.json | length == 0
+  register: gitlab_member_create
+  changed_when: true
+  no_log: "{{ gitlab_api_no_log }}"
+
+- name: Add the team members to the group (409 means already a member)
+  ansible.builtin.uri:
+    url: "{{ gitlab_local_api_url }}/groups/{{ gitlab_group_id }}/members"
+    method: POST
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_api_token_value }}"
+    body_format: json
+    body:
+      user_id: "{{ (item.1.json if item.1 is not skipped else item.0.json[0]).id }}"
+      access_level: "{{ item.0.item.access_level | default(30) | int }}"
+    status_code: [201, 409]
+  loop: "{{ gitlab_member_lookup.results | zip(gitlab_member_create.results | default([])) | list }}"
+  loop_control:
+    label: "{{ item.0.item.username }}"
+  register: gitlab_member_add
+  changed_when: gitlab_member_add.status == 201
+  no_log: "{{ gitlab_api_no_log }}"

@@ -1,3 +1,59 @@
+# ==============================================================================
+# Pipeline of the infra repository (code-keeper/infra on GitLab): Terraform for
+# the staging and production environments.
+#
+# This folder is published as its own GitLab project (scripts/publish_repos.sh),
+# so every path below is relative to the folder itself.
+#
+# Init, Plan and the two applies need the AWS keys and the Terraform state
+# settings. Those are protected CI/CD variables, which GitLab only passes to the
+# protected main branch, so these jobs run on main only. Merge requests and other
+# branches run the Validate jobs, which need no credentials; that is what the
+# "pipeline must succeed" merge rule checks.
+#
+# CI/CD variables (created by Ansible, role gitlab, from CK_<name> values):
+#   group code-keeper:  AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+#                       DOCKERHUB_USERNAME, DOCKERHUB_TOKEN, DOCKERHUB_REPO
+#   project infra:      TF_STATE_BUCKET, TF_STATE_REGION, TF_STATE_LOCK_TABLE,
+#                       TF_VAR_inventory_db_password, TF_VAR_billing_db_password,
+#                       TF_VAR_rabbitmq_password
+#
+# Image tags: Terraform only seeds the first task definition revision, with
+# release_tag from terraform.tfvars. The ECS services ignore later task definition
+# changes made here; the app pipelines deploy their own commit-SHA images.
+# ==============================================================================
+
+stages:
+  - Init
+  - Validate
+  - Plan
+  - Apply to Staging
+  - Approval
+  - Apply to Production
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    # A branch with an open merge request is already tested by the merge request
+    # pipeline; skipping the branch pipeline avoids running everything twice.
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
+variables:
+  TF_IN_AUTOMATION: "true"
+  AWS_DEFAULT_REGION: "us-east-1"
+  # The DOCKERHUB_REPO group variable overrides this default.
+  DOCKERHUB_REPO: "sntentop"
+  TF_VAR_image_repository_prefix: docker.io/${DOCKERHUB_REPO}
+
+default:
+  image:
+    name: hashicorp/terraform:1.6
+    entrypoint: [""]
+  before_script:
+    - terraform --version
+
 # Both Init jobs save to this one key, and each job's archive holds only its own
 # environment's .terraform, so the last job to finish replaces the other's. The
 # cache only saves download time: every job that runs Terraform in an environment
@@ -5,406 +61,191 @@
 cache:
   key: "${CI_COMMIT_REF_SLUG}-terraform"
   paths:
-  - infra/environments/staging/.terraform
-  - infra/environments/production/.terraform
-  - infra/environments/staging/.terraform.lock.hcl
-  - infra/environments/production/.terraform.lock.hcl
+    - environments/staging/.terraform
+    - environments/production/.terraform
+    - environments/staging/.terraform.lock.hcl
+    - environments/production/.terraform.lock.hcl
 
 # ------------------------------------------------------------------------------
-# Stage 1: Init
+# Stage 1: Init (main only: needs the protected state settings)
 # ------------------------------------------------------------------------------
 infra:init:staging:
   stage: Init
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - if: $CI_COMMIT_BRANCH == "main"
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - if: $CI_COMMIT_BRANCH
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - when: never
+  rules: &main_only
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_BRANCH == "main"
   script:
-  - cd infra/environments/staging
-  - 'test -n "${TF_STATE_BUCKET:-}" || { echo "ERROR: TF_STATE_BUCKET CI protected variable is unset"; exit 1; }'
-  - 'test -n "${TF_STATE_REGION:-}" || { echo "ERROR: TF_STATE_REGION CI protected variable is unset"; exit 1; }'
-  - 'test -n "${TF_STATE_LOCK_TABLE:-}" || { echo "ERROR: TF_STATE_LOCK_TABLE CI protected variable is unset"; exit 1; }'
-  - >-
-    terraform init -input=false
-    -backend-config=backend.hcl
-    -backend-config="bucket=${TF_STATE_BUCKET}"
-    -backend-config="region=${TF_STATE_REGION}"
-    -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}"
+    - cd environments/staging
+    - 'test -n "${TF_STATE_BUCKET:-}" || { echo "ERROR: TF_STATE_BUCKET CI protected variable is unset"; exit 1; }'
+    - 'test -n "${TF_STATE_REGION:-}" || { echo "ERROR: TF_STATE_REGION CI protected variable is unset"; exit 1; }'
+    - 'test -n "${TF_STATE_LOCK_TABLE:-}" || { echo "ERROR: TF_STATE_LOCK_TABLE CI protected variable is unset"; exit 1; }'
+    - &tf_init >-
+      terraform init -input=false
+      -backend-config=backend.hcl
+      -backend-config="bucket=${TF_STATE_BUCKET}"
+      -backend-config="region=${TF_STATE_REGION}"
+      -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}"
   # .terraform is deliberately NOT uploaded. The provider tree is 675 MB against a
   # 100 MB max_artifacts_size, so the upload would fail and take the whole Init
   # stage, and therefore every later stage, with it. Each job re-runs
   # `terraform init` against the cached lock file instead.
   artifacts:
     paths:
-    - infra/environments/staging/.terraform.lock.hcl
+      - environments/staging/.terraform.lock.hcl
     expire_in: 1 day
 
-  variables:
-    DOCKERHUB_REPO: "grafido"
-    TF_VAR_image_repository_prefix: docker.io/${DOCKERHUB_REPO}
-    TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
-    TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "us-east-1"
-  image: &id001
-    name: hashicorp/terraform:1.6
-    entrypoint: [""]
-  before_script:
-  - terraform --version
 infra:init:production:
   stage: Init
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - if: $CI_COMMIT_BRANCH == "main"
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - if: $CI_COMMIT_BRANCH
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - when: never
+  rules: *main_only
   script:
-  - cd infra/environments/production
-  - 'test -n "${TF_STATE_BUCKET:-}" || { echo "ERROR: TF_STATE_BUCKET CI protected variable is unset"; exit 1; }'
-  - 'test -n "${TF_STATE_REGION:-}" || { echo "ERROR: TF_STATE_REGION CI protected variable is unset"; exit 1; }'
-  - 'test -n "${TF_STATE_LOCK_TABLE:-}" || { echo "ERROR: TF_STATE_LOCK_TABLE CI protected variable is unset"; exit 1; }'
-  - >-
-    terraform init -input=false
-    -backend-config=backend.hcl
-    -backend-config="bucket=${TF_STATE_BUCKET}"
-    -backend-config="region=${TF_STATE_REGION}"
-    -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}"
+    - cd environments/production
+    - 'test -n "${TF_STATE_BUCKET:-}" || { echo "ERROR: TF_STATE_BUCKET CI protected variable is unset"; exit 1; }'
+    - 'test -n "${TF_STATE_REGION:-}" || { echo "ERROR: TF_STATE_REGION CI protected variable is unset"; exit 1; }'
+    - 'test -n "${TF_STATE_LOCK_TABLE:-}" || { echo "ERROR: TF_STATE_LOCK_TABLE CI protected variable is unset"; exit 1; }'
+    - *tf_init
   artifacts:
     paths:
-    - infra/environments/production/.terraform.lock.hcl
+      - environments/production/.terraform.lock.hcl
     expire_in: 1 day
 
 # ------------------------------------------------------------------------------
-# Stage 2: Validate
+# Stage 2: Validate (every branch and merge request: no credentials needed)
 # ------------------------------------------------------------------------------
-  variables:
-    DOCKERHUB_REPO: "grafido"
-    TF_VAR_image_repository_prefix: docker.io/${DOCKERHUB_REPO}
-    TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
-    TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "us-east-1"
-  image: *id001
-  before_script:
-  - terraform --version
 infra:validate:syntax:
   stage: Validate
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - if: $CI_COMMIT_BRANCH == "main"
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - if: $CI_COMMIT_BRANCH
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - when: never
+  rules: &every_pipeline
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH
   script:
-  - cd infra
-  - terraform fmt -check -recursive
-  - cd environments/staging && terraform init -backend=false -input=false && terraform validate
-  - cd ../production && terraform init -backend=false -input=false && terraform validate
+    - terraform fmt -check -recursive
+    - cd environments/staging && terraform init -backend=false -input=false && terraform validate
+    - cd ../production && terraform init -backend=false -input=false && terraform validate
 
-  variables:
-    DOCKERHUB_REPO: "grafido"
-    TF_VAR_image_repository_prefix: docker.io/${DOCKERHUB_REPO}
-    TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
-    TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "us-east-1"
-  image: *id001
-  before_script:
-  - terraform --version
 infra:validate:security:
   stage: Validate
   image:
     name: aquasec/trivy:latest
     entrypoint: [""]
   before_script:
-  - trivy --version
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - if: $CI_COMMIT_BRANCH == "main"
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - if: $CI_COMMIT_BRANCH
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - when: never
+    - trivy --version
+  rules: *every_pipeline
   script:
-    # infra/.trivyignore lists the accepted findings and why each is accepted. New
+    # .trivyignore lists the accepted findings and why each is accepted. New
     # HIGH/CRITICAL findings still fail this gate.
-  - trivy config --severity HIGH,CRITICAL --ignorefile infra/.trivyignore --exit-code 1 infra/
+    - trivy config --severity HIGH,CRITICAL --ignorefile .trivyignore --exit-code 1 .
   allow_failure: false
 
-  variables:
-    TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "us-east-1"
 infra:validate:dependencies:
   stage: Validate
   rules:
-  - if: $CI_COMMIT_BRANCH == "main"
-    when: on_success
-  - when: never
+    - if: $CI_COMMIT_BRANCH == "main"
   script:
-  - echo "=== [Validate] Reporting outdated Terraform providers for dependency review ==="
-  - cd infra/environments/staging
-  - terraform init -backend=false -input=false
-  - terraform outdated || echo "terraform outdated reported no comparable provider versions"
+    - echo "=== [Validate] Provider versions, locked against newest allowed and newest released ==="
+    - cd environments/staging
+    - grep -E '^provider|^  version' .terraform.lock.hcl > /tmp/locked.txt
+    # -upgrade picks the newest versions the constraints allow; the job's copy of the lock file is thrown away.
+    - terraform init -upgrade -backend=false -input=false > /dev/null
+    - grep -E '^provider|^  version' .terraform.lock.hcl > /tmp/newest.txt
+    - if diff /tmp/locked.txt /tmp/newest.txt; then echo "Providers are at the newest versions the constraints allow"; else echo "Newer versions are allowed (lines with >), update .terraform.lock.hcl"; fi
+    - |
+      for provider in $(grep -o '^provider "registry.terraform.io/[^"]*' /tmp/locked.txt | cut -d/ -f2-); do
+        latest=$(wget -qO- "https://registry.terraform.io/v1/providers/${provider}" | grep -o '"version":"[^"]*"' | head -1 | cut -d'"' -f4)
+        echo "${provider} newest release ${latest:-unknown}, a new major needs a constraint change"
+      done
   allow_failure: true
 
 # ------------------------------------------------------------------------------
-# Stage 3: Plan
+# Stage 3: Plan (main only: needs AWS and the database passwords)
 # ------------------------------------------------------------------------------
-  variables:
-    TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "us-east-1"
-  image: *id001
-  before_script:
-  - terraform --version
 infra:plan:staging:
   stage: Plan
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - if: $CI_COMMIT_BRANCH == "main"
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - if: $CI_COMMIT_BRANCH
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - when: never
+  rules: *main_only
+  variables:
+    # ECS pulls the service images as this Docker Hub user. A project-level
+    # TF_VAR_dockerhub_token (for example a read-only token) overrides it.
+    TF_VAR_dockerhub_username: ${DOCKERHUB_USERNAME}
+    TF_VAR_dockerhub_token: ${DOCKERHUB_TOKEN}
   script:
-  - cd infra/environments/staging
-  - 'test -n "${TF_VAR_inventory_db_password:-}" || { echo "ERROR: TF_VAR_inventory_db_password CI masked var is unset"; exit 1; }'
-  - 'test -n "${TF_VAR_billing_db_password:-}" || { echo "ERROR: TF_VAR_billing_db_password CI masked var is unset"; exit 1; }'
-  - 'test -n "${TF_VAR_rabbitmq_password:-}" || { echo "ERROR: TF_VAR_rabbitmq_password CI masked var is unset"; exit 1; }'
-  - 'test -n "${TF_VAR_dockerhub_username:-}" || { echo "ERROR: DOCKERHUB_USERNAME CI variable is unset"; exit 1; }'
-  - 'test -n "${TF_VAR_dockerhub_token:-}" || { echo "ERROR: DOCKERHUB_TOKEN CI masked var is unset"; exit 1; }'
-  - >-
-    terraform init -input=false
-    -backend-config=backend.hcl
-    -backend-config="bucket=${TF_STATE_BUCKET}"
-    -backend-config="region=${TF_STATE_REGION}"
-    -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}"
-  - terraform plan -input=false -out=staging.tfplan
+    - cd environments/staging
+    - &check_plan_vars |
+      test -n "${TF_VAR_inventory_db_password:-}" || { echo "ERROR: TF_VAR_inventory_db_password CI masked var is unset"; exit 1; }
+      test -n "${TF_VAR_billing_db_password:-}" || { echo "ERROR: TF_VAR_billing_db_password CI masked var is unset"; exit 1; }
+      test -n "${TF_VAR_rabbitmq_password:-}" || { echo "ERROR: TF_VAR_rabbitmq_password CI masked var is unset"; exit 1; }
+      test -n "${TF_VAR_dockerhub_username:-}" || { echo "ERROR: DOCKERHUB_USERNAME CI variable is unset"; exit 1; }
+      test -n "${TF_VAR_dockerhub_token:-}" || { echo "ERROR: DOCKERHUB_TOKEN CI masked var is unset"; exit 1; }
+    - *tf_init
+    - terraform plan -input=false -out=staging.tfplan
   artifacts:
     name: "staging-tfplan-${CI_COMMIT_SHORT_SHA}"
     paths:
-    - infra/environments/staging/staging.tfplan
+      - environments/staging/staging.tfplan
     expire_in: 7 days
 
-  variables:
-    DOCKERHUB_REPO: "grafido"
-    TF_VAR_image_repository_prefix: docker.io/${DOCKERHUB_REPO}
-    TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
-    # ECS pulls the service images as this Docker Hub user. A project-level
-    # TF_VAR_dockerhub_token (for example a read-only token) overrides it.
-    TF_VAR_dockerhub_username: ${DOCKERHUB_USERNAME}
-    TF_VAR_dockerhub_token: ${DOCKERHUB_TOKEN}
-    TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "us-east-1"
-  image: *id001
-  before_script:
-  - terraform --version
 infra:plan:production:
   stage: Plan
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - if: $CI_COMMIT_BRANCH == "main"
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - if: $CI_COMMIT_BRANCH
-    changes:
-      paths:
-      - infra/**/*
-    when: on_success
-  - when: never
+  rules: *main_only
+  variables:
+    TF_VAR_dockerhub_username: ${DOCKERHUB_USERNAME}
+    TF_VAR_dockerhub_token: ${DOCKERHUB_TOKEN}
   script:
-  - cd infra/environments/production
-  - 'test -n "${TF_VAR_inventory_db_password:-}" || { echo "ERROR: TF_VAR_inventory_db_password CI masked var is unset"; exit 1; }'
-  - 'test -n "${TF_VAR_billing_db_password:-}" || { echo "ERROR: TF_VAR_billing_db_password CI masked var is unset"; exit 1; }'
-  - 'test -n "${TF_VAR_rabbitmq_password:-}" || { echo "ERROR: TF_VAR_rabbitmq_password CI masked var is unset"; exit 1; }'
-  - 'test -n "${TF_VAR_dockerhub_username:-}" || { echo "ERROR: DOCKERHUB_USERNAME CI variable is unset"; exit 1; }'
-  - 'test -n "${TF_VAR_dockerhub_token:-}" || { echo "ERROR: DOCKERHUB_TOKEN CI masked var is unset"; exit 1; }'
-  - >-
-    terraform init -input=false
-    -backend-config=backend.hcl
-    -backend-config="bucket=${TF_STATE_BUCKET}"
-    -backend-config="region=${TF_STATE_REGION}"
-    -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}"
-  - terraform plan -input=false -out=production.tfplan
+    - cd environments/production
+    - *check_plan_vars
+    - *tf_init
+    - terraform plan -input=false -out=production.tfplan
   artifacts:
     name: "production-tfplan-${CI_COMMIT_SHORT_SHA}"
     paths:
-    - infra/environments/production/production.tfplan
+      - environments/production/production.tfplan
     expire_in: 7 days
 
 # ------------------------------------------------------------------------------
-# Stage 4: Apply to Staging (Automated on Protected Main Branch)
+# Stage 4: Apply to Staging (automatic on the protected main branch)
 # ------------------------------------------------------------------------------
-  variables:
-    DOCKERHUB_REPO: "grafido"
-    TF_VAR_image_repository_prefix: docker.io/${DOCKERHUB_REPO}
-    TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
-    # ECS pulls the service images as this Docker Hub user. A project-level
-    # TF_VAR_dockerhub_token (for example a read-only token) overrides it.
-    TF_VAR_dockerhub_username: ${DOCKERHUB_USERNAME}
-    TF_VAR_dockerhub_token: ${DOCKERHUB_TOKEN}
-    TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "us-east-1"
-  image: *id001
-  before_script:
-  - terraform --version
 infra:apply:staging:
   stage: Apply to Staging
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule"
-    when: never
-  # Same changes: filter as infra:plan:staging, so the staging.tfplan this job
-  # applies exists whenever the job does.
-  - if: $CI_COMMIT_BRANCH == "main"
-    changes:
-      paths:
-      - infra/**/*
+  rules: *main_only
   script:
-  - cd infra/environments/staging
-  - >-
-    terraform init -input=false
-    -backend-config=backend.hcl
-    -backend-config="bucket=${TF_STATE_BUCKET}"
-    -backend-config="region=${TF_STATE_REGION}"
-    -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}"
-  - terraform apply -input=false -auto-approve staging.tfplan
+    - cd environments/staging
+    - *tf_init
+    - terraform apply -input=false -auto-approve staging.tfplan
   environment:
     name: staging
     url: https://staging.code-keeper.internal
 
 # ------------------------------------------------------------------------------
-# Stage 5: Approval (Manual Gate for Production Promotion)
+# Stage 5: Approval (manual gate for production)
 # ------------------------------------------------------------------------------
-  variables:
-    DOCKERHUB_REPO: "grafido"
-    TF_VAR_image_repository_prefix: docker.io/${DOCKERHUB_REPO}
-    TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
-    TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "us-east-1"
-  image: *id001
-  before_script:
-  - terraform --version
 infra:approval:production:
   stage: Approval
-  # Production approval follows the staging apply, not every app job in the
-  # earlier stages.
+  # Production approval follows the staging apply.
   needs:
-  - infra:apply:staging
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule"
-    when: never
-  - if: $CI_COMMIT_BRANCH == "main"
-    changes:
-      paths:
-      - infra/**/*
+    - infra:apply:staging
+  rules: *main_only
   when: manual
   allow_failure: false
+  before_script: []
   script:
-  - echo "============================================================"
-  - echo " Production Deployment Approval Granted by Operator"
-  - echo " Authorizing promotion of changes from staging to production"
-  - 'echo " Commit: ${CI_COMMIT_SHA} by ${GITLAB_USER_NAME}"'
-  - echo "============================================================"
+    - echo "============================================================"
+    - echo " Production Deployment Approval Granted by Operator"
+    - echo " Authorizing promotion of changes from staging to production"
+    - 'echo " Commit: ${CI_COMMIT_SHA} by ${GITLAB_USER_NAME}"'
+    - echo "============================================================"
 
 # ------------------------------------------------------------------------------
-# Stage 6: Apply to Production (Executes Only After Manual Approval)
+# Stage 6: Apply to Production (runs only after the manual approval)
 # ------------------------------------------------------------------------------
-  variables:
-    TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "us-east-1"
-  image: *id001
-  before_script:
-  - terraform --version
 infra:apply:production:
   stage: Apply to Production
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule"
-    when: never
-  # Same changes: filter as infra:plan:production, so the plan this job needs
-  # and the production.tfplan it applies exist whenever the job does.
-  - if: $CI_COMMIT_BRANCH == "main"
-    changes:
-      paths:
-      - infra/**/*
+  rules: *main_only
   needs:
-  - infra:approval:production
-  - infra:plan:production
+    - infra:approval:production
+    - infra:plan:production
   script:
-  - cd infra/environments/production
-  - >-
-    terraform init -input=false
-    -backend-config=backend.hcl
-    -backend-config="bucket=${TF_STATE_BUCKET}"
-    -backend-config="region=${TF_STATE_REGION}"
-    -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}"
-  - terraform apply -input=false -auto-approve production.tfplan
+    - cd environments/production
+    - *tf_init
+    - terraform apply -input=false -auto-approve production.tfplan
   environment:
     name: production
     url: https://production.code-keeper.internal
-  variables:
-    DOCKERHUB_REPO: "grafido"
-    TF_VAR_image_repository_prefix: docker.io/${DOCKERHUB_REPO}
-    TF_VAR_release_tag: ${CI_COMMIT_SHORT_SHA}
-    TF_IN_AUTOMATION: "true"
-    AWS_DEFAULT_REGION: "us-east-1"
-  image: *id001
-  before_script:
-  - terraform --version

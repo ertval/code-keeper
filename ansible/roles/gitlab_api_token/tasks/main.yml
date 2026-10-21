@@ -1,0 +1,38 @@
+---
+# Creates the root personal access token used by the API tasks in the gitlab and
+# gitlab_runner roles (instance settings, group, projects, CI/CD variables, runner).
+# This is GitLab's documented way to create a token programmatically
+# (gitlab-rails runner + set_token). The value is generated here, passed to Rails
+# through the environment rather than the command line, kept only in memory as the
+# fact `gitlab_api_token_value`, and expires after one day.
+
+- name: Generate a fresh automation token value
+  ansible.builtin.set_fact:
+    gitlab_api_token_value: "glpat-{{ lookup('ansible.builtin.password', '/dev/null', length=40, chars=['ascii_letters', 'digits']) }}"
+  no_log: true
+
+- name: Register the automation token for root (revokes the previous one, expires after one day)
+  ansible.builtin.command:
+    argv:
+      - gitlab-rails
+      - runner
+      - |
+        user = User.find_by_username('root')
+        name = ENV.fetch('CK_TOKEN_NAME')
+        user.personal_access_tokens.active.where(name: name).each(&:revoke!)
+        pat = user.personal_access_tokens.create!(
+          scopes: ENV.fetch('CK_TOKEN_SCOPES').split(','),
+          name: name,
+          expires_at: 1.day.from_now
+        )
+        pat.set_token(ENV.fetch('CK_API_TOKEN'))
+        pat.save!
+        puts 'automation token ready'
+  environment:
+    CK_API_TOKEN: "{{ gitlab_api_token_value }}"
+    CK_TOKEN_NAME: "{{ gitlab_api_token_name }}"
+    CK_TOKEN_SCOPES: "{{ gitlab_api_token_scopes | join(',') }}"
+  register: gitlab_api_token_result
+  changed_when: true
+  failed_when: "'automation token ready' not in gitlab_api_token_result.stdout"
+  no_log: true

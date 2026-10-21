@@ -31,6 +31,34 @@
     creates: /etc/apt/sources.list.d/gitlab_gitlab-ce.list
   when: not gitlab_repo_file.stat.exists
 
+# The package runs `gitlab-ctl reconfigure` during installation, and that first run
+# creates the database and the root user. initial_root_password only counts at that
+# moment, so on a new host gitlab.rb is written before the package is installed.
+# On later runs configure.yml manages the file and reconfigures on changes.
+- name: Check whether GitLab is already installed
+  ansible.builtin.stat:
+    path: /opt/gitlab/bin/gitlab-ctl
+  register: gitlab_ctl_binary
+
+- name: Ensure /etc/gitlab exists before the first installation
+  ansible.builtin.file:
+    path: /etc/gitlab
+    state: directory
+    mode: '0775'
+    owner: root
+    group: root
+  when: not gitlab_ctl_binary.stat.exists
+
+- name: Write gitlab.rb before the first installation (root password and URL for the new database)
+  ansible.builtin.template:
+    src: gitlab.rb.j2
+    dest: /etc/gitlab/gitlab.rb
+    owner: root
+    group: root
+    mode: '0600'
+  diff: false
+  when: not gitlab_ctl_binary.stat.exists
+
 - name: Install GitLab CE package
   ansible.builtin.apt:
     name: "{{ gitlab_edition }}{{ '=' + gitlab_version if gitlab_version else '' }}"

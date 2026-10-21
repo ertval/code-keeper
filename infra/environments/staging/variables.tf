@@ -94,16 +94,13 @@ variable "billing_app_image" {
 
 variable "image_repository_prefix" {
   description = <<-EOT
-    Registry namespace holding the service images, without a trailing slash.
-    No default on purpose: the CI pipelines push to $${CI_REGISTRY_IMAGE}/<service>
-    and export TF_VAR_image_repository_prefix=$${CI_REGISTRY_IMAGE}, so a value
-    is always supplied on the path that matters. The previous default,
-    "code-keeper", was a bare name that resolved to a Docker Hub *user* which
-    does not exist -- a manual `terraform apply` silently produced task
-    definitions pointing at images that were never pushed, and the first
-    revision is seeded once and then guarded by
-    `lifecycle { ignore_changes = [task_definition] }`, so nothing ever
-    corrected it afterwards.
+    Registry namespace holding the service images, without a trailing slash,
+    for example docker.io/sntentop. No default on purpose: the infra pipeline
+    sets TF_VAR_image_repository_prefix=docker.io/$${DOCKERHUB_REPO}, the
+    namespace the app pipelines push to. A default could point a manual
+    `terraform apply` at images that were never pushed, and nothing corrects the
+    first task definition afterwards because of
+    `lifecycle { ignore_changes = [task_definition] }`.
   EOT
   type        = string
 

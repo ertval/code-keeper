@@ -1,66 +1,130 @@
 ---
-# Keep every `#` comment in this file OUTSIDE any `command:`/`shell:` block
-# scalar. Inside a folded (`>`) or literal (`|`) scalar `#` is not a comment --
-# it is literal content, folded into the command string and then split into argv
-# by the command module, which does not use a shell. A comment placed inside the
-# register command below is passed to gitlab-runner as ~16 bogus arguments,
-# registration fails, and `failed_when: false` reports success anyway.
+# Runner registration with a runner authentication token (glrt-...). The legacy
+# registration token (`gitlab-runner register --registration-token`) is disabled by
+# default since GitLab 17.0, so the runner is created on the GitLab side through
+# the API, and this host's config.toml is written from a template with the token
+# GitLab returns. Tags, untagged jobs, locking and the access level are runner
+# settings in GitLab and are set when it is created.
+#
+# Idempotent: when config.toml already holds a token that `gitlab-runner verify`
+# accepts, nothing is created. If the token is missing or no longer valid, the runner
+# with the same description is reused and its token reset, or a new runner is
+# created when there is none.
 
-- name: List already-registered GitLab Runners
-  ansible.builtin.command: gitlab-runner list
-  register: existing_runners
+- name: Read the existing runner configuration
+  ansible.builtin.slurp:
+    src: /etc/gitlab-runner/config.toml
+  register: gitlab_runner_config_current
+  failed_when: false
+  no_log: true
+
+- name: Take the runner token from the existing configuration, if any
+  ansible.builtin.set_fact:
+    gitlab_runner_auth_token: >-
+      {{ (gitlab_runner_config_current.content | b64decode
+          | regex_findall('token = "(glrt-[^"]+)"') | first | default(''))
+         if gitlab_runner_config_current.content is defined else '' }}
+  no_log: true
+
+- name: Check that GitLab still accepts the existing token
+  ansible.builtin.command: gitlab-runner verify --name "{{ gitlab_runner_description }}"
+  register: gitlab_runner_verify_existing
+  when: gitlab_runner_auth_token | length > 0
   changed_when: false
   failed_when: false
-  check_mode: false
 
-- name: Pre-render the --docker-volumes arguments
-  # A {% for %} inside the folded scalar below does not expand as it appears
-  # to; it leaves a literal `{{ vol }}` in argv. Render the quoted list once,
-  # here, where Jinja is actually evaluated.
+- name: Drop a token that GitLab no longer accepts
   ansible.builtin.set_fact:
-    runner_docker_volumes_arg: >-
-      {% for vol in gitlab_runner_docker_volumes %}"{{ vol }}" {% endfor %}
+    gitlab_runner_auth_token: ""
+  when:
+    - gitlab_runner_auth_token | length > 0
+    - "'is valid' not in (gitlab_runner_verify_existing.stderr | default('')) ~ (gitlab_runner_verify_existing.stdout | default(''))"
 
-- name: Register GitLab Runner with Docker executor
-  # privileged stays false because container images are built with kaniko,
-  # which needs neither a privileged runner nor a Docker socket.
-  ansible.builtin.command: >
-    gitlab-runner register
-    --non-interactive
-    --url "{{ gitlab_runner_url }}"
-    --registration-token "{{ gitlab_runner_registration_token }}"
-    --executor "{{ gitlab_runner_executor }}"
-    --docker-image "{{ gitlab_runner_default_image }}"
-    --description "{{ gitlab_runner_description }}"
-    --tag-list "{{ gitlab_runner_tags | join(',') }}"
-    --run-untagged="{{ gitlab_runner_run_untagged | lower }}"
-    --locked="{{ gitlab_runner_locked | lower }}"
-    --access-level="{{ gitlab_runner_access_level }}"
-    --docker-privileged="{{ gitlab_runner_docker_privileged | lower }}"
-    --docker-volumes {{ runner_docker_volumes_arg }}
-  when: gitlab_runner_description not in existing_runners.stdout
-  register: runner_registration
+- name: Use the admin API token created on the GitLab host
+  ansible.builtin.set_fact:
+    gitlab_runner_admin_token: "{{ hostvars[groups[gitlab_runner_gitlab_host_group][0]].gitlab_api_token_value }}"
+  when: gitlab_runner_auth_token | length == 0
+  no_log: true
+
+- name: Look for an existing instance runner with this description
+  ansible.builtin.uri:
+    url: "{{ gitlab_runner_api_url }}/runners/all?type=instance_type&per_page=100"
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_runner_admin_token }}"
+    status_code: [200]
+  register: gitlab_runner_server_list
+  when: gitlab_runner_auth_token | length == 0
+  no_log: true
+
+- name: Pick the runner id to reuse, if one exists
+  ansible.builtin.set_fact:
+    gitlab_runner_server_id: >-
+      {{ gitlab_runner_server_list.json
+         | selectattr('description', 'equalto', gitlab_runner_description)
+         | map(attribute='id') | first | default('') }}
+  when: gitlab_runner_auth_token | length == 0
+
+- name: Reset the token of the existing runner
+  ansible.builtin.uri:
+    url: "{{ gitlab_runner_api_url }}/runners/{{ gitlab_runner_server_id }}/reset_authentication_token"
+    method: POST
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_runner_admin_token }}"
+    status_code: [201]
+  register: gitlab_runner_token_reset
+  when:
+    - gitlab_runner_auth_token | length == 0
+    - gitlab_runner_server_id | string | length > 0
   changed_when: true
+  no_log: true
+
+- name: Create the instance runner in GitLab
+  ansible.builtin.uri:
+    url: "{{ gitlab_runner_api_url }}/user/runners"
+    method: POST
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_runner_admin_token }}"
+    body_format: json
+    body:
+      runner_type: "instance_type"
+      description: "{{ gitlab_runner_description }}"
+      tag_list: "{{ gitlab_runner_tags }}"
+      run_untagged: "{{ gitlab_runner_run_untagged | bool }}"
+      locked: "{{ gitlab_runner_locked | bool }}"
+      access_level: "{{ gitlab_runner_access_level }}"
+    status_code: [201]
+  register: gitlab_runner_created
+  when:
+    - gitlab_runner_auth_token | length == 0
+    - gitlab_runner_server_id | string | length == 0
+  changed_when: true
+  no_log: true
+
+- name: Keep the new runner token
+  ansible.builtin.set_fact:
+    gitlab_runner_auth_token: >-
+      {{ gitlab_runner_token_reset.json.token if gitlab_runner_token_reset is not skipped
+         else gitlab_runner_created.json.token }}
+  when: gitlab_runner_auth_token | length == 0
+  no_log: true
+
+- name: Write the runner configuration (Docker executor, token included)
+  ansible.builtin.template:
+    src: config.toml.j2
+    dest: /etc/gitlab-runner/config.toml
+    owner: root
+    group: root
+    mode: "0600"
+  diff: false
+  no_log: true
   notify:
     - Restart GitLab Runner
-  check_mode: false
 
-- name: Assert the runner is actually registered
-  # Closes the silent-failure class: a non-zero exit from `register` above used
-  # to be swallowed, so a play that never registered a runner still reported
-  # success. Verify against ground truth instead of trusting the exit status.
-  ansible.builtin.command: gitlab-runner list
-  register: runners_after_registration
+- name: Apply the new configuration now
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify the runner against GitLab
+  ansible.builtin.command: gitlab-runner verify --name "{{ gitlab_runner_description }}"
+  register: gitlab_runner_verify
   changed_when: false
-  failed_when: false
-  check_mode: false
-
-- name: Fail unless {{ gitlab_runner_description }} appears in the runner list
-  ansible.builtin.assert:
-    that:
-      - gitlab_runner_description in runners_after_registration.stdout
-    fail_msg: >-
-      gitlab-runner register did not take effect: "{{ gitlab_runner_description }}"
-      is absent from `gitlab-runner list`. Registration exited
-      {{ runner_registration.rc | default('n/a') }}. See the output above.
-  when: runner_registration is not skipped
+  failed_when: "'is valid' not in (gitlab_runner_verify.stderr ~ gitlab_runner_verify.stdout)"

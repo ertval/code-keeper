@@ -1,0 +1,9 @@
+---
+# Whole platform in one run: GitLab first, then the runners that register with it.
+#   ansible-playbook playbooks/site.yml
+#   ansible-playbook playbooks/site.yml --list-tasks
+- name: Deploy and configure GitLab
+  ansible.builtin.import_playbook: deploy-gitlab.yml
+
+- name: Deploy and register the GitLab Runners
+  ansible.builtin.import_playbook: deploy-runners.yml

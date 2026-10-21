@@ -6,5 +6,15 @@
 - name: Include configuration tasks
   ansible.builtin.import_tasks: configure.yml
 
-- name: Include CI/CD settings customization tasks
+- name: Create the short-lived API token used by the tasks below
+  ansible.builtin.import_role:
+    name: gitlab_api_token
+
+- name: Include instance settings tasks (authentication, branch protection, CI/CD)
   ansible.builtin.import_tasks: cicd.yml
+
+- name: Include group, project and team member tasks
+  ansible.builtin.import_tasks: projects.yml
+
+- name: Include CI/CD variable tasks
+  ansible.builtin.import_tasks: variables.yml

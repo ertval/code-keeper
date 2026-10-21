@@ -1,31 +1,41 @@
 ---
 # Defaults for role: gitlab_runner
 gitlab_runner_package: "gitlab-runner"
-# Pin the runner version for reproducible installs (empty = latest).
-gitlab_runner_version: ""
+# Pinned to match gitlab_version. The gitlab-runner package depends on exactly the
+# same version of gitlab-runner-helper-images, so both are installed at this version.
+gitlab_runner_version: "19.5.0-1"
 # APT repository setup script: downloaded to disk first (no curl|bash pipe);
 # pin its sha256 below once vendored for your release.
 gitlab_runner_repo_script_url: "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh"
 gitlab_runner_repo_script_sha256: ""
-gitlab_runner_url: "http://gitlab.example.com"
-# No default token committed. Must be provided via GITLAB_RUNNER_TOKEN
-# environment variable (CI masked var). Playbooks assert it is set.
-gitlab_runner_registration_token: "{{ lookup('env', 'GITLAB_RUNNER_TOKEN') }}"
+# GitLab's external URL, from the inventory written by ansible/terraform.
+gitlab_runner_url: "{{ gitlab_external_url | default(lookup('env', 'GITLAB_EXTERNAL_URL') | default('http://gitlab.example.com', true)) }}"
+gitlab_runner_api_url: "{{ gitlab_runner_url }}/api/v4"
+# Registration uses runner authentication tokens (glrt-...). The role creates the
+# runner through the API with the short-lived admin token from the gitlab_api_token
+# role, which runs on the first host of this inventory group.
+gitlab_runner_gitlab_host_group: "gitlab_servers"
 gitlab_runner_description: "docker-shared-runner-01"
 gitlab_runner_executor: "docker"
-gitlab_runner_default_image: "docker:24.0.5"
+# Only used by jobs that do not name an image; every code-keeper job names its own.
+gitlab_runner_default_image: "alpine:3.24.2"
 # Least privilege: unprivileged builds. Use kaniko/rootless builder images
 # for Docker image builds instead of docker-in-docker with host socket.
 gitlab_runner_docker_privileged: false
 gitlab_runner_docker_volumes:
   - "/cache"
+# Tags, untagged jobs, locking and the access level belong to the runner on the
+# GitLab side; with authentication tokens they are set when the runner is created,
+# not by `gitlab-runner register`.
 gitlab_runner_tags:
   - "docker"
   - "shared"
   - "ci-cd"
   - "linux"
-gitlab_runner_concurrent: 4
-gitlab_runner_check_interval: 0
 gitlab_runner_run_untagged: true
 gitlab_runner_locked: false
+# not_protected: the CI stages must run on every branch and merge request. Deploy
+# credentials are protected CI/CD variables, so they only reach protected branches.
 gitlab_runner_access_level: "not_protected"
+gitlab_runner_concurrent: 4
+gitlab_runner_check_interval: 0

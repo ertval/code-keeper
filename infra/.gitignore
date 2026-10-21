@@ -1,0 +1,22 @@
+# This folder is also published as its own repository (code-keeper/infra), so it
+# carries the ignore rules it needs. Same patterns as the monorepo's .gitignore.
+
+# Secrets and credentials
+.env
+.env.*
+*.pem
+*.key
+
+# Terraform state, plans and local provider trees.
+# .terraform.lock.hcl stays tracked (dependency pinning).
+*.tfstate
+*.tfstate.*
+*.tfvars.json
+.terraform/
+*.tfplan
+crash.log
+
+# OS / editor files
+.DS_Store
+.vscode/
+.idea/

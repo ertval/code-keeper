@@ -1,14 +1,15 @@
 ---
 # Playbook: Deploy and Configure GitLab CE
-# Purpose: Automates full deployment of GitLab CE instance, user security, CI/CD parameters
+# Purpose: Automates full deployment of GitLab CE instance, user security, CI/CD
+# parameters, the code-keeper group and projects, and their CI/CD variables.
 - name: Deploy and Configure GitLab CE Instance
   hosts: gitlab_servers
   become: true
   gather_facts: true
 
   vars:
-    # Overridable playbook-level defaults (no secrets committed here).
-    gitlab_external_url: "{{ lookup('env', 'GITLAB_EXTERNAL_URL') | default('http://gitlab.example.com', true) }}"
+    # No password is committed; it comes from the environment of the machine that
+    # runs Ansible. gitlab_external_url comes from the inventory.
     gitlab_root_password: "{{ lookup('env', 'GITLAB_ROOT_PASSWORD') }}"
 
   pre_tasks:
@@ -16,8 +17,9 @@
       ansible.builtin.assert:
         that:
           - gitlab_root_password is defined
-          - gitlab_root_password | length > 0
-        fail_msg: "GITLAB_ROOT_PASSWORD env var (CI masked variable) must be set; no default password is committed."
+          - gitlab_root_password | length >= 12
+        fail_msg: "Set GITLAB_ROOT_PASSWORD (at least 12 characters) in the environment; no default password is committed."
+        quiet: true
 
   roles:
     - role: gitlab
@@ -32,4 +34,5 @@
       ansible.builtin.debug:
         msg:
           - "GitLab instance successfully configured at {{ gitlab_external_url }}"
+          - "Projects: {{ gitlab_projects | map(attribute='path') | map('regex_replace', '^', gitlab_group_path ~ '/') | list }}"
           - "Services status: {{ gitlab_status.stdout_lines | default(['Running']) }}"

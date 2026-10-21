@@ -1,3 +1,4 @@
+# Managed by Ansible (role gitlab_runner); changes made here are overwritten.
 concurrent = {{ gitlab_runner_concurrent }}
 check_interval = {{ gitlab_runner_check_interval }}
 shutdown_timeout = 0
@@ -5,21 +6,13 @@ shutdown_timeout = 0
 [session_server]
   session_timeout = 1800
 
-{% if registered_runner_token is defined or registered_runners.stdout is defined %}
 [[runners]]
   name = "{{ gitlab_runner_description }}"
   url = "{{ gitlab_runner_url }}"
-  id = 1
-  token = "{{ gitlab_runner_token }}"
-  token_obtained_at = 2026-01-01T00:00:00Z
-  token_expires_at = 0001-01-01T00:00:00Z
+  token = "{{ gitlab_runner_auth_token }}"
   executor = "{{ gitlab_runner_executor }}"
-  [runners.custom_build_dir]
   [runners.cache]
     MaxUploadedArchiveSize = 0
-    [runners.cache.s3]
-    [runners.cache.gcs]
-    [runners.cache.azure]
   [runners.docker]
     tls_verify = false
     image = "{{ gitlab_runner_default_image }}"
@@ -30,4 +23,3 @@ shutdown_timeout = 0
     volumes = [{% for vol in gitlab_runner_docker_volumes %}"{{ vol }}"{% if not loop.last %}, {% endif %}{% endfor %}]
     shm_size = 0
     network_mtu = 0
-{% endif %}

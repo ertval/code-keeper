@@ -2,7 +2,7 @@
 # with `terraform init -backend-config=backend.hcl`; credentials are never stored
 # here, they are inherited from the AWS_* environment variables of the caller.
 # dynamodb_table provides state locking: the S3 native lock (use_lockfile) needs
-# Terraform >= 1.10 and the runner is pinned to 1.9.5.
+# Terraform >= 1.10 and the CI jobs run hashicorp/terraform:1.6.
 key            = "code-keeper/production/terraform.tfstate"
 encrypt        = true
 

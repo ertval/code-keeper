@@ -1,14 +1,17 @@
 ---
 # Defaults for role: gitlab
 gitlab_edition: "gitlab-ce"
-# Pin the GitLab version for reproducible installs (empty = latest; set e.g. "16.11.0-ce.0" in production).
-gitlab_version: ""
+# Pinned so every install is the same version. Upgrade on purpose, one step of
+# GitLab's documented upgrade path at a time, and keep gitlab_runner_version in step.
+gitlab_version: "19.5.0-ce.0"
 # APT repository setup script: downloaded to disk first (no curl|bash pipe) so
 # it can be reviewed; pin its sha256 below once vendored for your release.
 # Example: sha256sum /tmp/gitlab-repo-script.deb.sh -> paste digest here.
 gitlab_repo_script_url: "https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh"
 gitlab_repo_script_sha256: ""
-gitlab_external_url: "http://gitlab.example.com"
+# The inventory written by ansible/terraform sets gitlab_external_url; without it,
+# the GITLAB_EXTERNAL_URL environment variable is used.
+gitlab_external_url: "{{ lookup('env', 'GITLAB_EXTERNAL_URL') | default('http://gitlab.example.com', true) }}"
 # No default password committed. Must be provided via GITLAB_ROOT_PASSWORD
 # environment variable (CI masked var). Playbooks assert it is set.
 gitlab_root_password: "{{ lookup('env', 'GITLAB_ROOT_PASSWORD') }}"
@@ -16,19 +19,76 @@ gitlab_root_email: "admin@example.com"
 gitlab_time_zone: "UTC"
 gitlab_email_enabled: false
 
+# The API tasks run on the GitLab host itself, through the bundled NGINX.
+gitlab_local_api_url: "http://127.0.0.1/api/v4"
+# API requests carry the admin token in a header, so their output stays hidden.
+# Set to false while debugging a failing API task.
+gitlab_api_no_log: true
+
 # GitLab Security & Access Defaults
 gitlab_signup_enabled: false
+gitlab_require_two_factor_authentication: false
 gitlab_default_projects_limit: 50
 gitlab_default_branch_name: "main"
-# Applied by the cicd task to ApplicationSetting.default_branch_protection:
-# 0 = fully unprotected, 1 = protected against pushes, 2 = fully protected.
-gitlab_default_branch_protection: 2
+# Who may push to and merge into a project's default branch, as GitLab access
+# levels: 30 = Developer, 40 = Maintainer, 0 = no one. Applied as the instance's
+# default_branch_protection_defaults, so every new project's main branch is
+# protected this way.
+gitlab_default_branch_push_access_level: 40
+gitlab_default_branch_merge_access_level: 40
+gitlab_default_branch_allow_force_push: false
 
 # CI/CD Settings
 gitlab_shared_runners_enabled: true
+# Shown above the instance runners on each project's CI/CD settings page. The
+# settings API requires it whenever shared_runners_enabled is sent.
+gitlab_shared_runners_text: "Docker executor runners managed by Ansible (role gitlab_runner)"
 gitlab_artifacts_max_size: 100
 gitlab_artifacts_expire_in: "30 days"
 gitlab_auto_devops_enabled: false
+
+# Group and projects for the four repositories. The publish script pushes each
+# folder of the code-keeper monorepo to the project of the same name.
+gitlab_group_path: "code-keeper"
+gitlab_group_name: "code-keeper"
+gitlab_group_visibility: "private"
+gitlab_projects:
+  - path: "infra"
+    description: "Terraform for the staging and production environments, with its own pipeline"
+  - path: "api-gateway"
+    description: "API gateway: forwards requests to the inventory app and the billing queue"
+  - path: "inventory-app"
+    description: "Inventory app and its PostgreSQL database"
+  - path: "billing-app"
+    description: "Billing worker: consumes the RabbitMQ queue into its PostgreSQL database"
+
+# Team members to create and add to the group. Each gets a random password; the
+# admin sets a real one under Admin > Users, or the member uses "Forgot password"
+# once email is configured. access_level: 30 = Developer, 40 = Maintainer.
+gitlab_team_members: []
+# - username: "jdoe"
+#   name: "Jane Doe"
+#   email: "jane@example.com"
+#   access_level: 40
+
+# CI/CD variables. Values are never stored here: each is read from the environment
+# variable "CK_<key>" on the machine that runs Ansible (for example
+# CK_AWS_ACCESS_KEY_ID), and a variable whose CK_ value is empty or unset is left as
+# it is in GitLab. Shared ones go on the group, so all four projects inherit them;
+# the rest go only on the project that needs them (least privilege).
+gitlab_group_variables:
+  - { key: "AWS_ACCESS_KEY_ID", masked: true, protected: true }
+  - { key: "AWS_SECRET_ACCESS_KEY", masked: true, protected: true }
+  - { key: "DOCKERHUB_USERNAME", masked: false, protected: true }
+  - { key: "DOCKERHUB_TOKEN", masked: true, protected: true }
+  - { key: "DOCKERHUB_REPO", masked: false, protected: false }
+gitlab_project_variables:
+  - { project: "infra", key: "TF_STATE_BUCKET", masked: false, protected: true }
+  - { project: "infra", key: "TF_STATE_REGION", masked: false, protected: true }
+  - { project: "infra", key: "TF_STATE_LOCK_TABLE", masked: false, protected: true }
+  - { project: "infra", key: "TF_VAR_inventory_db_password", masked: true, protected: true }
+  - { project: "infra", key: "TF_VAR_billing_db_password", masked: true, protected: true }
+  - { project: "infra", key: "TF_VAR_rabbitmq_password", masked: true, protected: true }
 
 # Omnibus Performance Tuning
 gitlab_puma_workers: 2

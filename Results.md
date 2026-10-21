@@ -1,10 +1,11 @@
 # Results
 
-- **Updated:** 2026-10-21 11:04 EEST
+- **Updated:** 2026-10-21 13:05 EEST
 - **Scope:** the deploy described in `docs/AWS_SETUP.md`, run against AWS account `REDACTED_AWS_ACCOUNT_ID`
   (us-east-1) from the local test GitLab (`root/code-keeper`), plus what the project still lacks for
   the audit.
-- **Code:** `main` at `5d9f578`, on zone01 and on the local GitLab.
+- **Code:** the deploy ran `5d9f578`. Since then: the Ansible fixes, GitLab on EC2, the split into
+  four repositories and the docs refresh, all uncommitted on top of `5f2d0c6`.
 
 ## Summary
 
@@ -72,66 +73,58 @@ Images: `docker.io/sntentop/{api-gateway,inventory-app,billing-app}`, tagged wit
 
 1. **Test** whatever you want to test now, while it runs.
 2. **Take it down.** Tell Claude when testing is over. Claude then runs `terraform destroy` for
-   production and then staging (step 11), and checks that nothing billable is left (step 12). The
+   production and then staging, and checks that nothing billable is left (`docs/AWS_SETUP.md`). The
    state bucket and lock table stay; they cost almost nothing.
-3. **Before the audit,** start a pipeline on `main` from the GitLab UI (Build → Pipelines → Run
-   pipeline). A pipeline started that way runs every job, including both Terraform applies. Then
-   start `infra:approval:production` and the three app approvals. Allow about 45 minutes.
+3. **Commit** the uncommitted work and copy the drafts from `drafts/` into `docs/`.
+4. **GitLab on EC2:** `ansible/terraform`, then `ansible-playbook playbooks/site.yml`, then
+   `scripts/publish_repos.sh` (`drafts/AWS_SETUP.md` steps 8 and 9).
+5. **Before the audit,** redeploy from the four projects on that GitLab (`drafts/AWS_SETUP.md`
+   step 12). Allow about an hour from a torn-down account.
 
 ---
 
-## Still missing for the audit, beyond AWS
-
-From the suggested order in `docs/READINESS_REVIEW.md`:
+## Status of what the audit still needed
 
 | Item | Status |
 |---|---|
 | Fix the pipeline and infra bugs | **Done**, including the deploy fixes above |
 | AWS deploy with one full green pipeline | **Done**: pipeline 14 |
-| Real GitLab and runner installed with the Ansible playbooks | Not started. Needs a host (VM or EC2) |
-| One repository per app and one for infra | Not started. Today all four live in one repo |
-| Docs match the code | Not started |
+| GitLab and runner installed with Ansible | **Ready, not run yet.** Fixed and tested against the local GitLab 19.5; the EC2 hosts come from `ansible/terraform/` |
+| One repository per app and one for infra | **Ready, not published yet.** Four standalone pipelines, published by `scripts/publish_repos.sh` |
+| Docs match the code | **Done for `README.md`.** `docs/` drafts are in `drafts/` |
 
-Details:
+What changed for each:
 
-- **Ansible GitLab.** The audit asks for a GitLab instance installed with Ansible and runners
-  executing jobs for all repositories. The local test GitLab does not count. Likely problems, not
-  yet checked: the runner registration uses legacy tokens and flags that current GitLab rejects,
-  `gitlab_version` is unpinned, and the `allowed_to_push` format in `ansible/roles/gitlab/tasks/cicd.yml`
-  is probably wrong.
-- **Repo split.** The brief requires each app in its own repository and the infra in an
-  independent repository with its own pipeline. After the split, the CI/CD variables belong on the
-  GitLab group so all four repos share them.
-- **Docs.** `README.md` and `docs/AUDIT_GUIDE.md` still describe the old setup (Docker-in-Docker,
-  GitLab registry, release tags, main-only pipelines, missing test files). `docs/AWS_SETUP.md` also
-  needs the findings from this deploy:
-  - the Free plan limits on RDS (at most 2 instances, at most 1 day of backups), and that both
-    environments together need the paid plan
-  - how to run a full pipeline for a redeploy
-  - that the first `terraform apply` seeds task definitions with a `staging-latest` or
-    `production-latest` tag, and the first deploy replaces it
+- **Ansible GitLab.**
+  - GitLab is pinned to `19.5.0-ce.0` and the runner to `19.5.0-1`.
+  - The runner is created through the API (`POST /user/runners`) and registered with its `glrt-`
+    token, which is reused while it is valid.
+  - The branch protection defaults are sent as `[{access_level: 40}]` and checked afterwards.
+  - Ansible also creates the group, the four projects with their merge rules, the team members and
+    the CI/CD variables.
+  - The initial root password is now applied on the first install.
+- **Repo split.** `infra/` and each `srcs/<app>/` have a standalone `.gitlab-ci.yml` and
+  `.gitignore`; the root `.gitlab-ci.yml` is deleted. The shared CI/CD variables go on the
+  `code-keeper` group, the Terraform state and password variables on the `infra` project.
+- **Docs.** `README.md` is rewritten. `drafts/` holds new versions of `AUDIT_GUIDE.md`,
+  `AWS_SETUP.md`, `READINESS_REVIEW.md` and `AUDIT_READINESS_PLAN.md` for `docs/`.
+- **Also fixed:**
+  - `infra:validate:dependencies` called `terraform outdated`, which does not exist. It now
+    compares the lock file with the newest allowed and the newest released provider versions.
+  - The stale `backend.hcl` and `image_repository_prefix` comments are corrected.
+  - `scripts/audit_orchestrator.sh` is executable again.
+  - `reports/` is regenerated on this machine.
 
-  Before submitting, remove or refresh `docs/AUDIT_READINESS_PLAN.md`, `reports/audit_report.json`
-  and probably `docs/READINESS_REVIEW.md`, which lists the project's failures and is partly out of
-  date. Files in `docs/` are changed by you; Claude drafts the text.
-
-Smaller points:
+Still open (the code items are also in section 12 of `README.md`):
 
 - `env.example`, committed in `a8691d8` and on zone01, contains the live Docker Hub token for
   `sntentop`. It is there on purpose so a teammate can see it, but it will be part of the
   submission unless it is removed and the token is replaced.
 - `Results.md` (this file) was committed in `a8691d8`; decide whether it belongs in the submission.
-- `terraform.tfvars` sets `release_tag` to `staging-latest` / `production-latest`, and tfvars take
-  priority over the CI's `TF_VAR_release_tag`. Terraform therefore creates task definitions that
-  point at tags that do not exist, and services run 0 tasks until the first deploy job. This is how
-  the design works, but the CI variable has no effect.
 - On the paid plan, RDS backups could go back to 7 days (`backup_retention_period` in
   `infra/environments/*/main.tf`).
 - The saved `.tfplan` artifacts contain the passwords and the Docker Hub token, and can be
   downloaded for 7 days.
-- `aquasec/trivy:latest` and `amazon/aws-cli:latest` are not pinned to a version.
-- The comment in `infra/environments/*/backend.hcl` says the runner uses Terraform 1.9.5; CI uses
-  `hashicorp/terraform:1.6`.
-- The `image_repository_prefix` description in `infra/environments/*/variables.tf` still mentions
-  the GitLab registry (`CI_REGISTRY_IMAGE`).
+- The Trivy, Gitleaks, SonarQube and AWS CLI images use `:latest`.
 - SonarQube is not configured, so the SonarQube jobs pass without uploading anything.
+- The pipelines' IAM user has `AdministratorAccess`.

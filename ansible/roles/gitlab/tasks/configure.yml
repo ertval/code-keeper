@@ -14,6 +14,8 @@
     owner: root
     group: root
     mode: '0600'
+  # The file holds initial_root_password, so --diff must not print it.
+  diff: false
   notify:
     - Reconfigure GitLab
     - Restart GitLab
@@ -24,12 +26,12 @@
 - name: Check initial root password file if exists
   ansible.builtin.stat:
     path: /etc/gitlab/initial_root_password
-  register: root_password_file
+  register: gitlab_root_password_file
 
 - name: Display note about initial root password file
   ansible.builtin.debug:
     msg: "Initial root credentials stored at /etc/gitlab/initial_root_password (valid for 24h)"
-  when: root_password_file.stat.exists
+  when: gitlab_root_password_file.stat.exists
 
 - name: Wait for GitLab web interface to respond
   ansible.builtin.uri:

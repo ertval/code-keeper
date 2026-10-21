@@ -2,12 +2,17 @@
 # ==============================================================================
 # Script: setup-gitlab.sh
 # Purpose: Deploys and configures GitLab CE using Ansible automation
-# Usage: ./ansible/scripts/setup-gitlab.sh [--syntax-check|--check|--run]
+# Usage: ./ansible/scripts/setup-gitlab.sh [--syntax-check|--check|--list-tasks|--run]
+#
+# Environment:
+#   GITLAB_ROOT_PASSWORD  required for --check and --run (at least 12 characters)
+#   CK_<KEY>              optional CI/CD variable values, see roles/gitlab/defaults
+#   INVENTORY             inventory file (default: inventory/aws.ini from ansible/terraform)
 # ==============================================================================
 set -euo pipefail
 
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-INVENTORY="${BASE_DIR}/inventory/hosts.ini"
+INVENTORY="${INVENTORY:-${BASE_DIR}/inventory/aws.ini}"
 PLAYBOOK="${BASE_DIR}/playbooks/deploy-gitlab.yml"
 MODE="${1:---run}"
 
@@ -18,42 +23,36 @@ echo " Playbook:  ${PLAYBOOK}"
 echo " Mode:      ${MODE}"
 echo "============================================================"
 
-# Root password must come from the environment (CI masked variable).
-# No fallback secret is committed in this repo.
-export GITLAB_EXTERNAL_URL="${GITLAB_EXTERNAL_URL:-http://gitlab.example.com}"
-if [ -z "${GITLAB_ROOT_PASSWORD:-}" ]; then
-  echo "[ERROR] GITLAB_ROOT_PASSWORD env var must be set (CI masked variable). Refusing to use a default password." >&2
+if ! command -v ansible-playbook &>/dev/null; then
+  echo "[ERROR] ansible-playbook not found. Install Ansible first, for example:" >&2
+  echo "        pipx install --include-deps ansible   or   sudo apt install ansible" >&2
   exit 1
 fi
-export GITLAB_ROOT_PASSWORD
 
-if ! command -v ansible-playbook &>/dev/null; then
-  echo "[WARNING] 'ansible-playbook' command not found in current environment PATH."
-  echo "[INFO] Validating playbook syntax using Python YAML parser instead..."
-  python3 -c "
-import yaml, sys
-with open('${PLAYBOOK}', 'r') as f:
-    yaml.safe_load(f)
-print('YAML syntax validation PASSED for ${PLAYBOOK}')
-"
-  exit 0
-fi
+cd "${BASE_DIR}"
 
 case "${MODE}" in
   --syntax-check)
-    echo "[INFO] Running Ansible syntax validation..."
     ansible-playbook -i "${INVENTORY}" "${PLAYBOOK}" --syntax-check
     ;;
-  --check)
-    echo "[INFO] Executing Ansible dry-run (check mode)..."
-    ansible-playbook -i "${INVENTORY}" "${PLAYBOOK}" --check
+  --list-tasks)
+    ansible-playbook -i "${INVENTORY}" "${PLAYBOOK}" --list-tasks
     ;;
-  --run)
-    echo "[INFO] Executing GitLab CE deployment playbook..."
-    ansible-playbook -i "${INVENTORY}" "${PLAYBOOK}"
+  --check|--run)
+    # Root password must come from the environment; no fallback secret is committed.
+    if [ -z "${GITLAB_ROOT_PASSWORD:-}" ] || [ "${#GITLAB_ROOT_PASSWORD}" -lt 12 ]; then
+      echo "[ERROR] Set GITLAB_ROOT_PASSWORD (at least 12 characters). Refusing to use a default password." >&2
+      exit 1
+    fi
+    export GITLAB_ROOT_PASSWORD
+    if [ "${MODE}" = "--check" ]; then
+      ansible-playbook -i "${INVENTORY}" "${PLAYBOOK}" --check
+    else
+      ansible-playbook -i "${INVENTORY}" "${PLAYBOOK}"
+    fi
     ;;
   *)
-    echo "Unknown argument '${MODE}'. Allowed: --syntax-check, --check, --run"
+    echo "Unknown argument '${MODE}'. Allowed: --syntax-check, --list-tasks, --check, --run"
     exit 1
     ;;
 esac

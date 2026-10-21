@@ -1,0 +1,22 @@
+# This folder is also published as its own repository (code-keeper/billing-app), so it
+# carries the ignore rules it needs. Same patterns as the monorepo's .gitignore.
+
+# Secrets and credentials
+.env
+.env.*
+*.pem
+*.key
+
+# Python cache, bytecode and test output
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+junit-report.xml
+
+# OS / editor files
+.DS_Store
+.vscode/
+.idea/

@@ -171,151 +171,68 @@ if scanned == 0:
 print(f"DONE|{'error' if failures else 'ok'}")
 PYEOF
 
-# 3. Infrastructure Pipeline Stage Checks
-log_header "3. Validating Infrastructure Pipeline Stages (infra/.gitlab-ci.yml)"
-report_assertions << 'PYEOF'
-import os, sys
+# 3-4. Standalone pipeline checks. infra/ and each srcs/<service>/ folder is
+# published as its own GitLab project (scripts/publish_repos.sh), where its
+# .gitlab-ci.yml is the root pipeline file. Each one must therefore stand on its
+# own: declare its stages and workflow, use only those stages, need only jobs of
+# the same file, and use paths relative to the folder.
+check_standalone_pipeline() {
+  PIPELINE="$1" REQUIRED_STAGES="$2" LEFTOVERS="$3" report_assertions << 'PYEOF'
+import os
 import yaml
 
-PIPELINE = "infra/.gitlab-ci.yml"
-failures = 0
-
-# GitLab resolves exactly one entry point: .gitlab-ci.yml at the repository
-# root. Nested .gitlab-ci.yml files are dead configuration unless the root pulls
-# them in, so the root's existence is asserted before anything else.
-ROOT = ".gitlab-ci.yml"
-if not os.path.isfile(ROOT):
-    print("FAIL|No root .gitlab-ci.yml: GitLab creates no pipeline at all, whatever the nested files contain")
-    failures += 1
-    root = {}
-else:
-    with open(ROOT, encoding="utf-8") as fh:
-        root = yaml.safe_load(fh) or {}
-    inc = [i.get("local") for i in (root.get("include") or []) if isinstance(i, dict)]
-    missing = [f for f in ("infra/.gitlab-ci.yml",
-                           "srcs/api-gateway/.gitlab-ci.yml",
-                           "srcs/inventory-app/.gitlab-ci.yml",
-                           "srcs/billing-app/.gitlab-ci.yml") if f not in inc]
-    if missing:
-        print(f"FAIL|root .gitlab-ci.yml does not include: {missing}")
-        failures += 1
-    else:
-        print(f"PASS|root .gitlab-ci.yml includes all {len(inc)} pipeline fragments")
-
-if not os.path.isfile(PIPELINE):
-    print(f"FAIL|Missing pipeline definition: {PIPELINE}")
-    failures += 1
-else:
-    with open(PIPELINE, encoding="utf-8") as fh:
-        data = yaml.safe_load(fh)
-
-    # Fragment invariant: the nested files must not declare stages/default/
-    # workflow/variables. In a merged config those keys are singletons and
-    # last-one-wins, which is exactly how the original collision bug happened.
-    for singleton in ("stages", "default", "workflow", "variables"):
-        if singleton in data:
-            print(f"FAIL|infra/.gitlab-ci.yml still declares '{singleton}': must be hoisted to the root .gitlab-ci.yml")
-            failures += 1
-        else:
-            print(f"PASS|infra/.gitlab-ci.yml does not re-declare '{singleton}'")
-    declared = set(root.get("stages") or [])
-    unresolved = sorted({v["stage"] for k, v in data.items()
-                         if isinstance(v, dict) and v.get("stage")} - declared)
-    if unresolved:
-        print(f"FAIL|infra/.gitlab-ci.yml jobs reference stages absent from the root: {unresolved}")
-        failures += 1
-    else:
-        print("PASS|infra/.gitlab-ci.yml job stages all resolve against the root stages list")
-
-print(f"DONE|{'error' if failures else 'ok'}")
-PYEOF
-
-# 4. Microservice Pipeline Stage Checks
-log_header "4. Validating Microservice Pipeline Stage Checks (CI/CD)"
-MICROSERVICES=("srcs/api-gateway" "srcs/inventory-app" "srcs/billing-app")
-for ms in "${MICROSERVICES[@]}"; do
-  report_assertions << PYEOF
-import os, sys
-import yaml
-
-PIPELINE = "${ms}/.gitlab-ci.yml"
-failures = 0
-
-if not os.path.isfile(PIPELINE):
-    print(f"FAIL|Missing pipeline definition: {PIPELINE}")
-    failures += 1
-else:
-    with open(PIPELINE, encoding="utf-8") as fh:
-        data = yaml.safe_load(fh)
-
-    with open(".gitlab-ci.yml", encoding="utf-8") as fh:
-        root = yaml.safe_load(fh) or {}
-    for singleton in ("stages", "default", "workflow", "variables"):
-        if singleton in data:
-            print(f"FAIL|{PIPELINE} still declares '{singleton}': must be hoisted to the root .gitlab-ci.yml")
-            failures += 1
-        else:
-            print(f"PASS|{PIPELINE} does not re-declare '{singleton}'")
-    declared = set(root.get("stages") or [])
-    unresolved = sorted({v["stage"] for k, v in data.items()
-                         if isinstance(v, dict) and v.get("stage")} - declared)
-    if unresolved:
-        print(f"FAIL|{PIPELINE} jobs reference stages absent from the root: {unresolved}")
-        failures += 1
-    else:
-        print(f"PASS|{PIPELINE} job stages all resolve against the root stages list")
-
-print(f"DONE|{'error' if failures else 'ok'}")
-PYEOF
-done
-
-# 4b. Merged-config coverage. Stage coverage is a property of the MERGED config,
-# not of any single fragment: a fragment legitimately covers only its own
-# stages, so checking coverage per fragment would report the other fragments'
-# stages as empty. What must hold is that no stage declared in the root is a
-# no-op that passes without ever running a job.
-log_header "4b. Validating Merged Stage Coverage (root + fragments)"
-report_assertions << 'PYEOF'
-import os, yaml
-
-ROOT = ".gitlab-ci.yml"
-FRAGMENTS = ["infra/.gitlab-ci.yml", "srcs/api-gateway/.gitlab-ci.yml",
-             "srcs/inventory-app/.gitlab-ci.yml", "srcs/billing-app/.gitlab-ci.yml"]
+PIPELINE = os.environ["PIPELINE"]
+REQUIRED = os.environ["REQUIRED_STAGES"].split("|")
+LEFTOVERS = os.environ["LEFTOVERS"].split("|")
 RESERVED = {"stages", "default", "variables", "workflow", "cache", "include"}
 failures = 0
 
-if not os.path.isfile(ROOT):
-    print("FAIL|no root .gitlab-ci.yml")
+def check(ok, good, bad):
+    global failures
+    print(("PASS|" + good) if ok else ("FAIL|" + bad))
+    failures += 0 if ok else 1
+
+if not os.path.isfile(PIPELINE):
+    check(False, "", f"Missing pipeline definition: {PIPELINE}")
 else:
-    root = yaml.safe_load(open(ROOT, encoding="utf-8")) or {}
-    declared = list(root.get("stages") or [])
-    owners = {s: [] for s in declared}
-    seen_jobs = {}
-    for f in FRAGMENTS:
-        d = yaml.safe_load(open(f, encoding="utf-8")) or {}
-        for k, v in d.items():
-            if k in RESERVED or not isinstance(v, dict):
-                continue
-            seen_jobs.setdefault(k, []).append(f)
-            s = v.get("stage")
-            if s in owners:
-                owners[s].append(k)
-    dupes = {k: fs for k, fs in seen_jobs.items() if len(fs) > 1}
-    if dupes:
-        for k, fs in dupes.items():
-            print(f"FAIL|job '{k}' is defined in {len(fs)} fragments -- GitLab keeps only the last")
-        failures += 1
-    else:
-        print(f"PASS|{len(seen_jobs)} jobs, all uniquely named across fragments")
-    for s in declared:
-        if owners[s]:
-            print(f"PASS|stage '{s}' is backed by {len(owners[s])} job(s)")
-        else:
-            print(f"FAIL|stage '{s}' is declared in the root but no job uses it")
-            failures += 1
+    data = yaml.safe_load(open(PIPELINE, encoding="utf-8")) or {}
+    jobs = {k: v for k, v in data.items() if k not in RESERVED and isinstance(v, dict)}
+    stages = list(data.get("stages") or [])
+    check(stages == REQUIRED, f"{PIPELINE} declares its own stages in order: {' -> '.join(stages)}",
+          f"{PIPELINE} stages {stages} differ from {REQUIRED}")
+    check("workflow" in data, f"{PIPELINE} declares its own workflow", f"{PIPELINE} has no workflow")
+    undeclared = sorted(k for k, v in jobs.items() if v.get("stage") not in stages)
+    check(not undeclared, f"{PIPELINE}: all {len(jobs)} jobs use a declared stage",
+          f"{PIPELINE}: jobs with an undeclared stage: {undeclared}")
+    empty = [st for st in stages if not any(v.get("stage") == st for v in jobs.values())]
+    check(not empty, f"{PIPELINE}: every stage has at least one job",
+          f"{PIPELINE}: stages without a job: {empty}")
+    needs = [(k, n.get("job") if isinstance(n, dict) else n)
+             for k, v in jobs.items() for n in (v.get("needs") or [])]
+    dangling = [f"{k} -> {n}" for k, n in needs if n not in jobs]
+    check(not dangling, f"{PIPELINE}: all {len(needs)} needs: name a job of this pipeline",
+          f"{PIPELINE}: needs: pointing outside this pipeline: {dangling}")
+    text = yaml.safe_dump(data)
+    leaked = [w for w in LEFTOVERS if w in text]
+    check(not leaked, f"{PIPELINE}: paths are relative to the folder (no monorepo prefixes)",
+          f"{PIPELINE}: monorepo leftovers: {leaked}")
 
 print(f"DONE|{'error' if failures else 'ok'}")
 PYEOF
+}
+
+log_header "3. Validating Infrastructure Pipeline (infra/.gitlab-ci.yml, standalone)"
+check_standalone_pipeline "infra/.gitlab-ci.yml" \
+  "Init|Validate|Plan|Apply to Staging|Approval|Apply to Production" \
+  "srcs/|infra/"
+
+log_header "4. Validating Microservice Pipelines (srcs/<service>/.gitlab-ci.yml, standalone)"
+MICROSERVICES=("srcs/api-gateway" "srcs/inventory-app" "srcs/billing-app")
+for ms in "${MICROSERVICES[@]}"; do
+  check_standalone_pipeline "${ms}/.gitlab-ci.yml" \
+    "Build|Test|Scan|Containerization|Deploy to Staging|Approval|Deploy to Production" \
+    "srcs/|infra/|APP_DIR"
+done
 
 # 5. Shell Script Syntax Validation
 log_header "5. Validating Shell Script Syntax (bash -n)"
@@ -324,6 +241,7 @@ SCRIPTS=(
   "ansible/scripts/register-runner.sh"
   "scripts/test_pipelines.sh"
   "scripts/verify_security.sh"
+  "scripts/publish_repos.sh"
 )
 for script in "${SCRIPTS[@]}"; do
   if [ -f "$script" ]; then
@@ -396,10 +314,10 @@ PYEOF
 # 9. Terraform Code Formatting Check
 log_header "9. Validating Terraform Code Formatting (terraform fmt -check)"
 if command -v terraform &>/dev/null; then
-  if terraform fmt -check -recursive infra; then
-    log_pass "Terraform formatting check passed across all modules and environments"
+  if terraform fmt -check -recursive infra && terraform fmt -check -recursive ansible/terraform; then
+    log_pass "Terraform formatting check passed across infra/ and ansible/terraform/"
   else
-    log_fail "Terraform formatting check failed! Run 'terraform fmt -recursive infra'"
+    log_fail "Terraform formatting check failed! Run 'terraform fmt -recursive infra ansible/terraform'"
   fi
 else
   log_info "terraform binary not installed; skipping format check"
@@ -410,7 +328,8 @@ log_header "10. Validating Ansible Playbooks, Roles & Task Resolution"
 if command -v ansible-playbook &>/dev/null; then
   run_capture "Ansible playbooks passed syntax check (--syntax-check)" \
     bash -c 'ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy-gitlab.yml --syntax-check >/dev/null &&
-             ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy-runners.yml --syntax-check >/dev/null'
+             ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy-runners.yml --syntax-check >/dev/null &&
+             ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/site.yml --syntax-check >/dev/null'
 
   run_capture "Ansible playbooks resolved roles and listed all tasks (--list-tasks)" \
     bash -c 'ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy-gitlab.yml --list-tasks >/dev/null &&

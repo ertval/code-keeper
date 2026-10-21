@@ -502,3 +502,84 @@ GitLab API.
 - `POST /api/billing`: each environment's billing worker logged the order as recorded, over AMQPS
   on port 5671.
 - AWS credits: $92.02, paid plan.
+
+## 2026-10-21 13:46 EEST: Ansible GitLab fixed, four standalone repositories, README and docs drafts
+
+**What**
+- Ansible, GitLab role (`ansible/roles/gitlab/`):
+  - `gitlab_version` pinned to `19.5.0-ce.0`.
+  - `tasks/cicd.yml`: the instance settings go through `PUT /application/settings`, with
+    `default_branch_protection_defaults` as `[{access_level: N}]` lists, checked after. Includes
+    `shared_runners_text`, which GitLab 19.5 requires.
+  - New `tasks/projects.yml` (group `code-keeper`, projects `infra`, `api-gateway`,
+    `inventory-app`, `billing-app` with merge rules, team members).
+  - New `tasks/variables.yml`: group and project CI/CD variables, read from `CK_<key>` environment
+    variables.
+  - `tasks/install.yml` writes `gitlab.rb` before the first package install, so
+    `initial_root_password` is applied.
+  - `defaults`, `handlers` and `configure.yml` updated to match.
+- Ansible, other roles:
+  - New role `ansible/roles/gitlab_api_token/`: a root API token that expires after one day,
+    created with `gitlab-rails runner`.
+  - `ansible/roles/gitlab_runner/`: runner `19.5.0-1` and its helper images pinned. The runner
+    is created with `POST /user/runners` and registered with its `glrt-` token, which is reused
+    while valid. Templated `config.toml` (mode 600).
+- Ansible, playbooks, config and scripts:
+  - `deploy-runners.yml` has two plays; new `site.yml` runs everything.
+  - `ansible.cfg` and `ansible/ansible.cfg` point to the generated `inventory/aws.ini`;
+    `hosts.ini` is an example.
+  - `ansible/scripts/setup-gitlab.sh` and `register-runner.sh` updated.
+- New `ansible/terraform/`: GitLab (t3.large) and runner (t3.medium) on EC2 with security groups,
+  Elastic IPs, IMDSv2, encrypted disks and the generated inventory. State in the existing S3 bucket.
+- Repository split:
+  - `infra/.gitlab-ci.yml` and `srcs/*/.gitlab-ci.yml` are standalone pipelines; merge requests
+    build images without pushing.
+  - The root `.gitlab-ci.yml` is deleted.
+  - New `.gitignore` in `infra/` and each `srcs/<app>/`.
+  - New `scripts/publish_repos.sh` (subtree split and push to `code-keeper/<project>`).
+- `infra/.gitlab-ci.yml`: `infra:validate:dependencies` called `terraform outdated`, which does not
+  exist. It now compares the locked provider versions with the newest allowed and the newest
+  released.
+- `infra/environments/*/backend.hcl` and `variables.tf`: stale comments about Terraform 1.9.5 and
+  the GitLab registry corrected (comments and a variable description only).
+- `scripts/test_pipelines.sh`: checks the standalone pipelines, the publish script, the EC2
+  Terraform and `site.yml`.
+- `scripts/audit_orchestrator.sh`, now executable:
+  - checks updated for the new runner and task names;
+  - two false positives fixed (a blank line between plays read as a role named `name`; a boolean
+    `force_random_password: true` read as a password);
+  - the live checks use `inventory/aws.ini` with its user and key when it exists.
+- `README.md`: rewritten for the current setup.
+- `Results.md`: status and next steps updated.
+- `reports/audit_report.json` and `reports/ansible_list_tasks.txt`: regenerated on this machine.
+- New `drafts/`: `AUDIT_GUIDE.md`, `AWS_SETUP.md`, `READINESS_REVIEW.md` and
+  `AUDIT_READINESS_PLAN.md`, for the user to check and copy into `docs/`. `docs/` is unchanged.
+
+**Why**
+The user asked to fix three things:
+- the Ansible GitLab problems (legacy runner tokens, unpinned version, wrong `allowed_to_push`
+  format);
+- the split into four repositories with CI/CD variables on a GitLab group;
+- the outdated docs.
+
+The user chose EC2 hosts, folders with a publish script, and drafts outside `docs/`. The
+`terraform outdated` job, the stale comments and the audit script problems came up while checking
+the docs against the code.
+
+**Verified**
+- Ansible roles, run against the local GitLab 19.5:
+  - First run creates the settings, group, projects, member and runner.
+  - A second run only rotates the API token.
+  - An invalid runner token is reset and then verifies.
+  - The variables task updates, then creates on 404, against a mock API.
+  - All test objects were deleted afterwards and the instance settings restored.
+- ansible-lint at the production profile: 0 failures.
+- All four pipelines accepted by GitLab's CI lint API.
+- The new dependency job script ran in `hashicorp/terraform:1.6`.
+- `terraform validate` passes in both environments.
+- Local scripts:
+  - `scripts/test_pipelines.sh`: 89 pass.
+  - `scripts/verify_security.sh`: 78 pass, 1 known false positive.
+  - `scripts/audit_orchestrator.sh`: 81 pass, 0 fail, 3 blocked until GitLab runs on EC2.
+  - shellcheck clean.
+- Not tested yet: the package install on a fresh EC2 host.

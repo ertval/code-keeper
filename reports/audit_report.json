@@ -1,11 +1,11 @@
 {
   "schema": "code-keeper/audit-orchestrator/1",
-  "generated_at": "2026-10-05T23:35:32+0300",
+  "generated_at": "2026-10-21T13:43:09+0300",
   "generator": "scripts/audit_orchestrator.sh",
   "shell_options": "set -uo pipefail; `set -e` is deliberately omitted so a failing control is recorded as a verdict instead of aborting the audit walk",
   "repo": {
-    "root": "/home/ertval/code/zone-modules/code-keeper",
-    "commit": "3128a2146889712dc03bf06a4378e5dbc859cf21",
+    "root": "/home/steven/Desktop/code-keeper",
+    "commit": "5f2d0c612bc0710c451551193ae6e2a57d45e15a",
     "branch": "main",
     "dirty": true
   },
@@ -21,29 +21,29 @@
     "roleplay_prompts": 16
   },
   "tool_versions": {
-    "terraform": "Terraform v1.9.5",
-    "ansible-playbook": "ansible-playbook [core 2.19.13]",
-    "ansible-lint": "ansible-lint \u001b[1;36m26.9.0\u001b[0m using\u001b[2m ansible-core:\u001b[1;36m2.19.13\u001b[0m ansible-compat:\u001b[1;36m26.9.0\u001b[0m ruamel-yaml:\u001b[1;36m0.19.1\u001b[0m\u001b[0m",
-    "tflint": "TFLint version 0.56.0",
-    "checkov": "3.3.22",
-    "tfsec": "v1.28.14",
-    "trivy": "Version: 0.75.0",
-    "hadolint": "Haskell Dockerfile Linter 2.12.0",
-    "gitleaks": "gitleaks version 8.24.0",
+    "terraform": "Terraform v1.6.6",
+    "ansible-playbook": "ansible-playbook [core 2.21.5]",
+    "ansible-lint": "ansible-lint 26.10.1 using ansible-core:2.21.5 ansible-compat:26.10.0 ruamel-yaml:0.19.1",
+    "tflint": "not installed",
+    "checkov": "not installed",
+    "tfsec": "not installed",
+    "trivy": "Version: 0.76.0",
+    "hadolint": "not installed",
+    "gitleaks": "gitleaks version v8.30.1",
     "yamllint": "yamllint 1.38.0",
     "shellcheck": "ShellCheck - shell script analysis tool",
-    "uv": "uv 0.11.19 (x86_64-unknown-linux-gnu)",
-    "python3": "Python 3.12.3",
-    "jq": "jq-1.7",
-    "docker": "Docker version 29.8.1, build 4a63305",
-    "terragrunt": "terragrunt version v0.72.0"
+    "uv": "uv 0.12.10 (x86_64-unknown-linux-gnu)",
+    "python3": "Python 3.13.7",
+    "jq": "jq-1.8.1",
+    "docker": "Docker version 29.7.2, build a7dcaa6",
+    "terragrunt": "not installed"
   },
   "totals": {
-    "PASS": 83,
+    "PASS": 81,
     "FAIL": 0,
     "BLOCKED-EXTERNAL": 3,
-    "SKIP": 0,
-    "INFO": 15,
+    "SKIP": 4,
+    "INFO": 13,
     "verdicts": 101
   },
   "verdict_semantics": {
@@ -116,7 +116,7 @@
       "id": "FILES-ANSIBLE",
       "label": "Ansible playbooks, roles, inventory and helper scripts present",
       "verdict": "PASS",
-      "evidence": "2 playbooks, 2 roles (gitlab,gitlab_runner), 2 deployment scripts, inventory present",
+      "evidence": "3 playbooks, 3 roles (gitlab,gitlab_api_token,gitlab_runner), 2 deployment scripts, inventory present",
       "advisory": false,
       "evidence_log": "reports/evidence/FILES-ANSIBLE.log",
       "audit_question": {
@@ -146,7 +146,7 @@
       "id": "ANSIBLE-LISTTASKS",
       "label": "--list-tasks resolves roles; real output archived for the auditor",
       "verdict": "PASS",
-      "evidence": "roles + tasks resolved for 2 playbooks; real output archived at reports/ansible_list_tasks.txt (48 lines, diff it against the guide)",
+      "evidence": "roles + tasks resolved for 2 playbooks; real output archived at reports/ansible_list_tasks.txt (80 lines, diff it against the guide)",
       "advisory": false,
       "evidence_log": "reports/evidence/ANSIBLE-LISTTASKS.log",
       "audit_question": {
@@ -161,7 +161,7 @@
       "id": "ANSIBLE-ROLES",
       "label": "Every referenced role resolves to ansible/roles/<role>",
       "verdict": "PASS",
-      "evidence": "4 role reference(s) resolve under ansible/roles/ (gitlab, gitlab_runner)",
+      "evidence": "6 role reference(s) resolve under ansible/roles/ (gitlab, gitlab_api_token, gitlab_runner)",
       "advisory": false,
       "evidence_log": "reports/evidence/ANSIBLE-ROLES.log",
       "audit_question": {
@@ -176,7 +176,7 @@
       "id": "ANSIBLE-TASKS",
       "label": "Expected deployment tasks appear in --list-tasks output",
       "verdict": "PASS",
-      "evidence": "all 6 expected deployment tasks present in the archived --list-tasks output",
+      "evidence": "all 8 expected deployment tasks present in the archived --list-tasks output",
       "advisory": false,
       "evidence_log": "reports/evidence/ANSIBLE-TASKS.log",
       "audit_question": {
@@ -191,7 +191,7 @@
       "id": "ANSIBLE-NOSECRET",
       "label": "No default token/password committed in playbooks or role defaults",
       "verdict": "PASS",
-      "evidence": "no committed token/password literals; 4 file(s) source secrets from environment lookups",
+      "evidence": "no committed token/password literals; 3 file(s) source secrets from environment lookups",
       "advisory": false,
       "evidence_log": "reports/evidence/ANSIBLE-NOSECRET.log",
       "audit_question": {
@@ -206,7 +206,7 @@
       "id": "RUNNER-FILES",
       "label": "Runner role + docker executor config template present",
       "verdict": "PASS",
-      "evidence": "docker executor rendered from config.toml.j2; registration passes --tag-list; privileged=templated false",
+      "evidence": "docker executor rendered from config.toml.j2; runner created through the API with tag_list (authentication token); privileged=templated false",
       "advisory": false,
       "evidence_log": "reports/evidence/RUNNER-FILES.log",
       "audit_question": {
@@ -236,7 +236,7 @@
       "id": "RUNNER-LIVE-LIST",
       "label": "LIVE 'gitlab-runner list' on the runner host",
       "verdict": "BLOCKED-EXTERNAL",
-      "evidence": "192.168.56.11 is not reachable from this machine (no route / no listener; ssh said 'ssh: connect to host 192.168.56.11 port 22: No route to host '). runner registration/execution cannot be observed locally is unproven here, and no SSH key or Ansible run can change that until the host is actually provisioned on a reachable network. Live command to run for the auditor: ssh 192.168.56.11 'sudo gitlab-runner list && systemctl is-active gitlab-runner'",
+      "evidence": "192.168.56.11 is not reachable from this machine (no route / no listener; ssh said 'ssh: connect to host 192.168.56.11 port 22: Connection timed out '). runner registration/execution cannot be observed locally is unproven here, and no SSH key or Ansible run can change that until the host is actually provisioned on a reachable network. Live command to run for the auditor: ssh ubuntu@192.168.56.11 'sudo gitlab-runner list && systemctl is-active gitlab-runner'",
       "advisory": false,
       "evidence_log": "reports/evidence/RUNNER-LIVE-LIST.log",
       "audit_question": {
@@ -251,7 +251,7 @@
       "id": "GITLAB-LIVE-STATUS",
       "label": "LIVE 'gitlab-ctl status' / systemctl on the GitLab host",
       "verdict": "BLOCKED-EXTERNAL",
-      "evidence": "192.168.56.10 is not reachable from this machine (no route / no listener; ssh said 'ssh: connect to host 192.168.56.10 port 22: No route to host '). GitLab service state cannot be observed locally is unproven here, and no SSH key or Ansible run can change that until the host is actually provisioned on a reachable network. Live command to run for the auditor: ssh 192.168.56.10 'sudo gitlab-ctl status && systemctl is-active gitlab-runsvdir'",
+      "evidence": "192.168.56.10 is not reachable from this machine (no route / no listener; ssh said 'ssh: connect to host 192.168.56.10 port 22: Connection timed out '). GitLab service state cannot be observed locally is unproven here, and no SSH key or Ansible run can change that until the host is actually provisioned on a reachable network. Live command to run for the auditor: ssh ubuntu@192.168.56.10 'sudo gitlab-ctl status && systemctl is-active gitlab-runsvdir'",
       "advisory": false,
       "evidence_log": "reports/evidence/GITLAB-LIVE-STATUS.log",
       "audit_question": {
@@ -266,7 +266,7 @@
       "id": "INFRA-STAGES",
       "label": "Infrastructure pipeline declares exactly the six required stages",
       "verdict": "PASS",
-      "evidence": "the six required stages are declared in order (effective list: Init -> Validate -> Plan -> Apply to Staging -> Build -> Test -> Scan -> Containerization -> Deploy to Staging -> Approval -> Deploy to Production -> Apply to Production)",
+      "evidence": "the six required stages are declared in order (effective list: Init -> Validate -> Plan -> Apply to Staging -> Approval -> Apply to Production)",
       "advisory": false,
       "evidence_log": "reports/evidence/INFRA-STAGES.log",
       "audit_question": {
@@ -341,7 +341,7 @@
       "id": "INFRA-INDEPENDENT",
       "label": "Infrastructure owns its own pipeline with a protected-branch gate",
       "verdict": "INFO",
-      "evidence": "infra/ owns its own pipeline building infra/**, but workflow:rules also triggers on [$CI_PIPELINE_SOURCE == \"merge_request_event\"; $CI_COMMIT_BRANCH]; guideline 1 wording expects protected-branch-only triggers (main-only workflow seen in: CYB1-WORKFLOW)",
+      "evidence": "infra/ owns its own pipeline building its Terraform roots, but workflow:rules also triggers on [$CI_PIPELINE_SOURCE == \"merge_request_event\"; $CI_COMMIT_BRANCH]; guideline 1 wording expects protected-branch-only triggers (main-only workflow seen in: CYB1-WORKFLOW)",
       "advisory": false,
       "evidence_log": "reports/evidence/INFRA-INDEPENDENT.log",
       "audit_question": {
@@ -371,7 +371,7 @@
       "id": "INFRA-VALIDATE-STAGING",
       "label": "terraform validate \u2014 staging (offline path reported)",
       "verdict": "PASS",
-      "evidence": "terraform validate succeeded for infra/environments/staging via vendored provider (.terraform/providers present, no init needed)",
+      "evidence": "terraform validate succeeded for infra/environments/staging via terraform init -backend=false (no vendored provider; offline-safe init)",
       "advisory": false,
       "evidence_log": "reports/evidence/INFRA-VALIDATE-STAGING.log",
       "audit_question": {
@@ -386,7 +386,7 @@
       "id": "INFRA-VALIDATE-PRODUCTION",
       "label": "terraform validate \u2014 production (offline path reported)",
       "verdict": "PASS",
-      "evidence": "terraform validate succeeded for infra/environments/production via vendored provider (.terraform/providers present, no init needed)",
+      "evidence": "terraform validate succeeded for infra/environments/production via terraform init -backend=false (no vendored provider; offline-safe init)",
       "advisory": false,
       "evidence_log": "reports/evidence/INFRA-VALIDATE-PRODUCTION.log",
       "audit_question": {
@@ -416,7 +416,7 @@
       "id": "CI-STAGES/api-gateway",
       "label": "Each microservice declares exactly the seven CI/CD stages",
       "verdict": "PASS",
-      "evidence": "api-gateway: the seven CI/CD stages are declared in order (effective list: Init -> Validate -> Plan -> Apply to Staging -> Build -> Test -> Scan -> Containerization -> Deploy to Staging -> Approval -> Deploy to Production -> Apply to Production)",
+      "evidence": "api-gateway: the seven CI/CD stages are declared in order (effective list: Build -> Test -> Scan -> Containerization -> Deploy to Staging -> Approval -> Deploy to Production)",
       "advisory": false,
       "evidence_log": "reports/evidence/CI-STAGES.log",
       "audit_question": {
@@ -431,7 +431,7 @@
       "id": "CI-STAGES/billing-app",
       "label": "Each microservice declares exactly the seven CI/CD stages",
       "verdict": "PASS",
-      "evidence": "billing-app: the seven CI/CD stages are declared in order (effective list: Init -> Validate -> Plan -> Apply to Staging -> Build -> Test -> Scan -> Containerization -> Deploy to Staging -> Approval -> Deploy to Production -> Apply to Production)",
+      "evidence": "billing-app: the seven CI/CD stages are declared in order (effective list: Build -> Test -> Scan -> Containerization -> Deploy to Staging -> Approval -> Deploy to Production)",
       "advisory": false,
       "evidence_log": "reports/evidence/CI-STAGES.log",
       "audit_question": {
@@ -446,7 +446,7 @@
       "id": "CI-STAGES/inventory-app",
       "label": "Each microservice declares exactly the seven CI/CD stages",
       "verdict": "PASS",
-      "evidence": "inventory-app: the seven CI/CD stages are declared in order (effective list: Init -> Validate -> Plan -> Apply to Staging -> Build -> Test -> Scan -> Containerization -> Deploy to Staging -> Approval -> Deploy to Production -> Apply to Production)",
+      "evidence": "inventory-app: the seven CI/CD stages are declared in order (effective list: Build -> Test -> Scan -> Containerization -> Deploy to Staging -> Approval -> Deploy to Production)",
       "advisory": false,
       "evidence_log": "reports/evidence/CI-STAGES.log",
       "audit_question": {
@@ -956,7 +956,7 @@
       "id": "FUNC-PYTEST/api-gateway",
       "label": "Unit suites run green through uv + pytest-cov",
       "verdict": "PASS",
-      "evidence": "uv run pytest: 7 passed in 0.35s",
+      "evidence": "uv run pytest: 7 passed in 2.06s",
       "advisory": false,
       "evidence_log": "reports/evidence/FUNC-PYTEST.log",
       "audit_question": {
@@ -971,7 +971,7 @@
       "id": "FUNC-PYTEST/billing-app",
       "label": "Unit suites run green through uv + pytest-cov",
       "verdict": "PASS",
-      "evidence": "uv run pytest: 32 passed in 2.13s",
+      "evidence": "uv run pytest: 32 passed in 2.34s",
       "advisory": false,
       "evidence_log": "reports/evidence/FUNC-PYTEST.log",
       "audit_question": {
@@ -986,7 +986,7 @@
       "id": "FUNC-PYTEST/inventory-app",
       "label": "Unit suites run green through uv + pytest-cov",
       "verdict": "PASS",
-      "evidence": "uv run pytest: 20 passed in 0.02s",
+      "evidence": "uv run pytest: 20 passed in 0.08s",
       "advisory": false,
       "evidence_log": "reports/evidence/FUNC-PYTEST.log",
       "audit_question": {
@@ -1015,8 +1015,8 @@
     {
       "id": "FUNC-HADOLINT",
       "label": "hadolint (error threshold) clean on every Dockerfile",
-      "verdict": "PASS",
-      "evidence": "0 hadolint errors in 3 Dockerfile(s); 3 advisory warning(s) not gating",
+      "verdict": "SKIP(missing tool: hadolint)",
+      "evidence": "hadolint not installed; 3 Dockerfile(s) unchecked",
       "advisory": false,
       "evidence_log": "reports/evidence/FUNC-HADOLINT.log",
       "audit_question": {
@@ -1031,7 +1031,7 @@
       "id": "FUNC-SHELL",
       "label": "bash -n succeeds for every shell script in the repo",
       "verdict": "PASS",
-      "evidence": "bash -n clean on all 5 shell scripts",
+      "evidence": "bash -n clean on all 6 shell scripts",
       "advisory": false,
       "evidence_log": "reports/evidence/FUNC-SHELL.log",
       "audit_question": {
@@ -1046,7 +1046,7 @@
       "id": "FUNC-YAML",
       "label": "Every CI/playbook YAML file parses (incl. openapi.yaml)",
       "verdict": "PASS",
-      "evidence": "20 YAML files parsed cleanly",
+      "evidence": "25 YAML files parsed cleanly",
       "advisory": false,
       "evidence_log": "reports/evidence/FUNC-YAML.log",
       "audit_question": {
@@ -1061,7 +1061,7 @@
       "id": "FUNC-APPLY",
       "label": "Pipelines really apply infra and deploy (terraform apply / ECS)",
       "verdict": "PASS",
-      "evidence": "2 terraform apply command(s) (both environments, -auto-approve) and 3 service deploy(s) wired",
+      "evidence": "0 terraform apply command(s) (both environments, -auto-approve) and 3 service deploy(s) wired",
       "advisory": false,
       "evidence_log": "reports/evidence/FUNC-APPLY.log",
       "audit_question": {
@@ -1105,8 +1105,8 @@
     {
       "id": "CYB1-WORKFLOW",
       "label": "No unprotected workflow entrypoint in any pipeline",
-      "verdict": "PASS",
-      "evidence": "4 pipelines refuse every branch except main",
+      "verdict": "INFO",
+      "evidence": "4/4 pipelines also run on non-protected refs (infra[$CI_PIPELINE_SOURCE == \"merge_request_event\"], srcs/api-gateway[$CI_PIPELINE_SOURCE == \"merge_request_event\"], srcs/billing-app[$CI_PIPELINE_SOURCE == \"merge_request_event\"], srcs/inventory-app[$CI_PIPELINE_SOURCE == \"merge_request_event\"]). Guideline 1 is worded as protected-branch-only triggers, so expect this question; the destructive-stage gate is proven separately by CYB1-JOBS",
       "advisory": false,
       "evidence_log": "reports/evidence/CYB1-WORKFLOW.log",
       "audit_question": {
@@ -1361,7 +1361,7 @@
       "id": "DOC-README",
       "label": "README.md substantive and covers prerequisites/setup/config/usage",
       "verdict": "PASS",
-      "evidence": "README.md: 41511 bytes / 525 lines covering prerequisites, setup, configuration and usage",
+      "evidence": "README.md: 38092 bytes / 661 lines covering prerequisites, setup, configuration and usage",
       "advisory": false,
       "evidence_log": "reports/evidence/DOC-README.log",
       "audit_question": {
@@ -1406,7 +1406,7 @@
       "id": "DOC-DIAGRAMS",
       "label": "Audit guide + README carry diagrams (mermaid/ASCII)",
       "verdict": "PASS",
-      "evidence": "9 diagrams (guide: 0 mermaid + 5 ascii; README: 0 mermaid + 4 ascii)",
+      "evidence": "7 diagrams (guide: 0 mermaid + 5 ascii; README: 0 mermaid + 2 ascii)",
       "advisory": false,
       "evidence_log": "reports/evidence/DOC-DIAGRAMS.log",
       "audit_question": {
@@ -1480,8 +1480,8 @@
     {
       "id": "ADV-TFLINT",
       "label": "tflint Terraform lint (advisory)",
-      "verdict": "INFO",
-      "evidence": "tflint: no issues in staging/production",
+      "verdict": "SKIP(missing tool: tflint)",
+      "evidence": "tflint not installed",
       "advisory": false,
       "evidence_log": "reports/evidence/ADV-TFLINT.log",
       "audit_question": {
@@ -1495,8 +1495,8 @@
     {
       "id": "ADV-CHECKOV",
       "label": "checkov IaC policy scan (advisory)",
-      "verdict": "INFO",
-      "evidence": "checkov reported findings (rc=2); informational only (use --strict to gate)",
+      "verdict": "SKIP(missing tool: checkov)",
+      "evidence": "checkov not installed; checkov IaC policy scan not evaluated",
       "advisory": false,
       "evidence_log": "reports/evidence/ADV-CHECKOV.log",
       "audit_question": {
@@ -1510,8 +1510,8 @@
     {
       "id": "ADV-TFSEC",
       "label": "tfsec IaC scan (advisory)",
-      "verdict": "INFO",
-      "evidence": "tfsec reported findings (rc=126); informational only (use --strict to gate)",
+      "verdict": "SKIP(missing tool: tfsec)",
+      "evidence": "tfsec not installed; tfsec IaC scan not evaluated",
       "advisory": false,
       "evidence_log": "reports/evidence/ADV-TFSEC.log",
       "audit_question": {
@@ -1541,7 +1541,7 @@
       "id": "ADV-YAMLLINT",
       "label": "yamllint over pipelines and playbooks (advisory)",
       "verdict": "INFO",
-      "evidence": "yamllint reported 604 finding(s) (mostly line-length; advisory)",
+      "evidence": "yamllint reported 302 finding(s) (mostly line-length; advisory)",
       "advisory": false,
       "evidence_log": "reports/evidence/ADV-YAMLLINT.log",
       "audit_question": {
@@ -1556,7 +1556,7 @@
       "id": "ADV-SHELLCHECK",
       "label": "shellcheck over repo scripts (advisory)",
       "verdict": "INFO",
-      "evidence": "shellcheck clean on 5 scripts",
+      "evidence": "shellcheck clean on 6 scripts",
       "advisory": false,
       "evidence_log": "reports/evidence/ADV-SHELLCHECK.log",
       "audit_question": {
@@ -1571,7 +1571,7 @@
       "id": "ADV-ANSIBLELINT",
       "label": "ansible-lint over ansible/ (advisory)",
       "verdict": "INFO",
-      "evidence": "ansible-lint reported 0 profile finding(s) (advisory; YAML line-length dominates)",
+      "evidence": "ansible-lint clean over ansible/",
       "advisory": false,
       "evidence_log": "reports/evidence/ADV-ANSIBLELINT.log",
       "audit_question": {
@@ -1658,7 +1658,7 @@
         "RUNNER-LIVE-LIST",
         "RUNNER-TAGS"
       ],
-      "evidence": "docker executor rendered from config.toml.j2; registration passes --tag-list; privileged=templated false"
+      "evidence": "docker executor rendered from config.toml.j2; runner created through the API with tag_list (authentication token); privileged=templated false"
     },
     {
       "id": "Q065",
@@ -1698,7 +1698,7 @@
       "controls": [
         "INFRA-INDEPENDENT"
       ],
-      "evidence": "infra/ owns its own pipeline building infra/**, but workflow:rules also triggers on [$CI_PIPELINE_SOURCE == \"merge_request_event\"; $CI_COMMIT_BRANCH]; guideline 1 wording expects protected-branch-only triggers (main-only workflow seen in: CYB1-WORKFLOW)"
+      "evidence": "infra/ owns its own pipeline building its Terraform roots, but workflow:rules also triggers on [$CI_PIPELINE_SOURCE == \"merge_request_event\"; $CI_COMMIT_BRANCH]; guideline 1 wording expects protected-branch-only triggers (main-only workflow seen in: CYB1-WORKFLOW)"
     },
     {
       "id": "Q071",
@@ -1712,7 +1712,7 @@
         "INFRA-STAGE-JOBS",
         "INFRA-STAGES"
       ],
-      "evidence": "the six required stages are declared in order (effective list: Init -> Validate -> Plan -> Apply to Staging -> Build -> Test -> Scan -> Containerization -> Deploy to Staging -> Approval -> Deploy to Production -> Apply to Production)"
+      "evidence": "the six required stages are declared in order (effective list: Init -> Validate -> Plan -> Apply to Staging -> Approval -> Apply to Production)"
     },
     {
       "id": "Q080",
@@ -1720,7 +1720,7 @@
       "slug": "are-the-build-test-scan-and-containerization-s",
       "text": "Are the Build, Test, Scan, and Containerization stages implemented correctly in the CI pipeline for each repository?",
       "section_id": "S073",
-      "verdict": "INFO",
+      "verdict": "SKIP",
       "controls": [
         "ADV-TFLINT",
         "CI-BUILD/api-gateway",
@@ -1741,7 +1741,7 @@
         "CI-TEST/billing-app",
         "CI-TEST/inventory-app"
       ],
-      "evidence": "api-gateway: the seven CI/CD stages are declared in order (effective list: Init -> Validate -> Plan -> Apply to Staging -> Build -> Test -> Scan -> Containerization -> Deploy to Staging -> Approval -> Deploy to Production -> Apply to Production)"
+      "evidence": "api-gateway: the seven CI/CD stages are declared in order (effective list: Build -> Test -> Scan -> Containerization -> Deploy to Staging -> Approval -> Deploy to Production)"
     },
     {
       "id": "Q088",
@@ -1788,7 +1788,7 @@
         "FUNC-SHELL",
         "FUNC-YAML"
       ],
-      "evidence": "uv run pytest: 7 passed in 0.35s"
+      "evidence": "uv run pytest: 7 passed in 2.06s"
     },
     {
       "id": "Q104",
@@ -1822,7 +1822,7 @@
         "CYB2-GITLEAKS",
         "INFRA-NO-SECRETS"
       ],
-      "evidence": "no committed token/password literals; 4 file(s) source secrets from environment lookups"
+      "evidence": "no committed token/password literals; 3 file(s) source secrets from environment lookups"
     },
     {
       "id": "Q108",
@@ -1830,7 +1830,7 @@
       "slug": "did-the-students-apply-the-least-privilege-pri",
       "text": "Did the students apply the least privilege principle to limit user and service access to the minimum required level?",
       "section_id": "S094",
-      "verdict": "INFO",
+      "verdict": "SKIP",
       "controls": [
         "ADV-CHECKOV",
         "ADV-TFSEC",
@@ -1869,7 +1869,7 @@
       "controls": [
         "DOC-README"
       ],
-      "evidence": "README.md: 41511 bytes / 525 lines covering prerequisites, setup, configuration and usage"
+      "evidence": "README.md: 38092 bytes / 661 lines covering prerequisites, setup, configuration and usage"
     },
     {
       "id": "Q116",

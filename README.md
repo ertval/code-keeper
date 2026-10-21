@@ -1,524 +1,660 @@
-# Code-Keeper: Enterprise DevOps & Microservices CI/CD Infrastructure
+# code-keeper
 
-[![CI/CD Pipeline](https://img.shields.io/badge/GitLab%20CI-Passing-brightgreen?logo=gitlab)](infra/.gitlab-ci.yml)
-[![Ansible Automation](https://img.shields.io/badge/Ansible-Automated-red?logo=ansible)](ansible/)
-[![Terraform IaC](https://img.shields.io/badge/Terraform-AWS%20Multi--Env-blue?logo=terraform)](infra/)
-[![Security Audited](https://img.shields.io/badge/Security-Hardened-success?logo=trivy)](scripts/verify_security.sh)
+[![GitLab CI](https://img.shields.io/badge/GitLab%20CI-4%20pipelines-orange?logo=gitlab)](#7-pipelines-in-detail)
+[![Ansible](https://img.shields.io/badge/Ansible-GitLab%20%2B%20Runner-red?logo=ansible)](ansible/)
+[![Terraform](https://img.shields.io/badge/Terraform-AWS%20staging%20%2B%20production-blue?logo=terraform)](infra/)
+[![Security](https://img.shields.io/badge/Security-scanned-success?logo=trivy)](#9-security)
 
-`code-keeper` delivers an enterprise-grade DevOps platform and end-to-end continuous integration and deployment (CI/CD) system for a containerized microservices application. This repository contains the complete automation stack:
+`code-keeper` builds, scans and deploys the three crud-master microservices in `srcs/` to two AWS
+environments, staging and production, with GitLab CI/CD:
 
-1. **Ansible Automation (`ansible/`)**: Automated provisioning, hardening, and configuration of GitLab Community Edition (CE) and GitLab Runners with Docker executors.
-2. **Infrastructure as Code (`infra/`)**: Dual-environment (Staging & Production) AWS infrastructure defined in modular Terraform, managed via a 6-stage automated pipeline with manual production gating.
-3. **Independent Microservice Pipelines (`srcs/api-gateway/`, `srcs/inventory-app/`, `srcs/billing-app/`)**: Full Python source code, container definitions, and independent 7-stage CI/CD pipelines featuring zero-downtime rolling deployments, SAST, container scanning, secret detection, and automated testing.
-4. **Cybersecurity Hardening**: Strict branch protection enforcement, credential decoupling via GitLab masked/protected variables, least-privilege network and container access, and automated vulnerability scanning.
-5. **Verification & Audit Tooling (`scripts/`)**: Complete simulation and verification scripts (`test_pipelines.sh` and `verify_security.sh`) to audit pipelines and security compliance before deployment.
+- **GitLab and its runner are installed with Ansible** (`ansible/`) on two EC2 hosts that
+  Terraform creates (`ansible/terraform/`). Ansible also creates the `code-keeper` group, the four
+  projects, the CI/CD variables and the runner.
+- **The infrastructure is Terraform** (`infra/`): one set of modules, two identical environments,
+  and a six-stage pipeline with a manual gate before production.
+- **Each microservice has its own repository and pipeline** (`srcs/<service>/`): build, test,
+  scan, containerize, deploy to staging, manual approval, zero-downtime deploy to production.
 
----
+This repository is the submission. It holds all four parts as folders, and
+`scripts/publish_repos.sh` pushes each folder to its own GitLab project, so on GitLab there are
+four independent repositories, each with its own pipeline.
 
-## 1. System Architecture
+## Contents
 
-### 1.1 Infrastructure Network & Cloud Topology (AWS)
-
-```
-                            INTERNET (End-Users & Developers)
-                                           │
-                                    HTTP 80 (ALB listener)
-                                           │
-               ┌───────────────────────────▼───────────────────────────┐
-               │         AWS Application Load Balancer (Public)        │
-               │   aws_lb_listener.http — port 80 only (no TLS/ACM)     │
-               └───────────────┬───────────────────────┬───────────────┘
-                               │ HTTP 3000             │ HTTP 3000
-                               ▼                       ▼
-    ┌────────────────────────────────────────────────────────────────────────┐
-    │ Private Application Subnets (AWS VPC)                                  │
-    │                                                                        │
-    │  ┌──────────────────────┐                     ┌──────────────────────┐ │
-    │  │   api-gateway    │── HTTP /api/movies ─►│    inventory-app     │ │
-    │  │ (Waitress/Flask:3000)│                     │ (Waitress/Flask:8080)│ │
-    │  └──────────┬───────────┘                     └──────────┬───────────┘ │
-    │             │                                            │             │
-    │      AMQP   │ POST /api/billing                          │ Port 5432   │
-    │      5672   │                                            ▼             │
-    │             ▼                                 ┌──────────────────────┐ │
-    │  ┌──────────────────────┐     Consume AMQP    │  inventory-database  │ │
-    │  │   Amazon MQ /        │◄────────────────────│  (PostgreSQL:5432)   │ │
-    │  │   RabbitMQ Broker    │                     └──────────────────────┘ │
-    │  └──────────────────────┘                                              │
-    │             ▲                                                          │
-    │             │ AMQP 5672                                                │
-    │  ┌──────────┴───────────┐                                              │
-    │  │     billing-app      │─── Port 5432 ──────►┌──────────────────────┐ │
-    │  │  (Worker & HTTP:8080)│                     │   billing-database   │ │
-    │  └──────────────────────┘                     │  (PostgreSQL:5432)   │ │
-    │                                               └──────────────────────┘ │
-    └────────────────────────────────────────────────────────────────────────┘
-```
-
-### 1.2 Multi-Stage Pipeline Architecture
-
-```
-MICROSERVICE PIPELINE:
-  [Build] ──► [Test] ──► [Scan] ──► [Containerization] ──► [Deploy to Staging] ──► [Approval] ──► [Deploy to Production]
-  - Bytecode   - Pytest   - Bandit    - Docker build        - Rolling update       (Manual Gate    - Zero Downtime
-  - Packaging  - Coverage - Trivy FS  - Trivy Container     - Smoke Test            Stakeholder    - Min Healthy 100%
-                          - Gitleaks  - Push to Registry                              Sign-off)     - Max Healthy 200%
-                          - SonarQube
-
-INFRASTRUCTURE PIPELINE:
-  [Init] ──► [Validate] ──► [Plan] ──► [Apply to Staging] ──► [Approval] ──► [Apply to Production]
-  - Backend   - tf fmt      - Staging   - Auto-apply           (Manual Gate   - Auto-apply
-  - Providers - tf validate - Prod        Staging Plan          Stakeholder     Production Plan
-              - Trivy IaC                                         Sign-off)
-```
+1. [What is where](#1-what-is-where)
+2. [Architecture](#2-architecture)
+3. [Directory structure](#3-directory-structure)
+4. [Prerequisites](#4-prerequisites)
+5. [Setup, first time](#5-setup-first-time)
+6. [Usage, day to day](#6-usage-day-to-day)
+7. [Pipelines in detail](#7-pipelines-in-detail)
+8. [Configuration reference](#8-configuration-reference)
+9. [Security](#9-security)
+10. [Verification and audit commands](#10-verification-and-audit-commands)
+11. [Costs and teardown](#11-costs-and-teardown)
+12. [Known limitations](#12-known-limitations)
+13. [Role-play questions](#13-role-play-questions)
+14. [Bonus](#14-bonus)
 
 ---
 
-## 2. Directory Structure
+## 1. What is where
+
+| Requirement from the brief | Where it is |
+|---|---|
+| GitLab deployed and configured with an Ansible playbook | `ansible/playbooks/site.yml` (`deploy-gitlab.yml` + `deploy-runners.yml`), roles `gitlab`, `gitlab_api_token`, `gitlab_runner` |
+| GitLab on a cloud platform, reachable by the team | EC2 hosts from `ansible/terraform/`, GitLab on port 80, sign-up disabled, accounts created by Ansible |
+| Runners integrated with the pipelines | Docker executor runner on its own EC2 host, created through the GitLab API by `ansible/roles/gitlab_runner` |
+| Each application in its own repository | GitLab projects `code-keeper/api-gateway`, `code-keeper/inventory-app`, `code-keeper/billing-app`, published from `srcs/<service>/` |
+| Infrastructure in an independent repository with a pipeline | GitLab project `code-keeper/infra`, published from `infra/` |
+| Two similar environments with Terraform | `infra/environments/staging` and `infra/environments/production`, same modules, same sizes |
+| Infra stages Init, Validate, Plan, Apply to Staging, Approval, Apply to Production | `infra/.gitlab-ci.yml` |
+| CI stages Build, Test, Scan, Containerization | `srcs/<service>/.gitlab-ci.yml` |
+| CD stages Deploy to Staging, Approval, Deploy to Production | `srcs/<service>/.gitlab-ci.yml` |
+| Cybersecurity guidelines | [Section 9](#9-security) |
+| Documentation | This file, plus `docs/` |
+
+---
+
+## 2. Architecture
+
+### 2.1 One AWS environment (staging and production are identical)
+
+```
+                        Internet
+                            │ HTTP 80
+             ┌──────────────▼──────────────┐
+ public      │  Application Load Balancer  │   NAT gateway (outbound only)
+ subnets     └──────────────┬──────────────┘
+                            │ 3000
+             ┌──────────────▼──────────────┐
+ private     │  api-gateway (Fargate, x2)  │──── /api/movies ────┐
+ subnets     └──────────────┬──────────────┘                    │ 8080
+                            │ AMQPS 5671                        │
+                            │ /api/billing          ┌───────────▼─────────────────┐
+             ┌──────────────▼──────────────┐        │ inventory-app (Fargate, x2) │
+             │    Amazon MQ for RabbitMQ   │        └───────────┬─────────────────┘
+             │     queue: billing_queue    │                    │ 5432
+             └──────────────┬──────────────┘                    │
+                            │ AMQPS 5671                        │
+             ┌──────────────▼──────────────┐                    │
+             │  billing-app (Fargate, x2)  │                    │
+             └──────────────┬──────────────┘                    │
+                            │ 5432                              │
+                            │                                   │
+                            │                                   │
+             ┌──────────────▼──────────────┐        ┌───────────▼─────────────────┐
+ database    │   RDS PostgreSQL "orders"   │        │   RDS PostgreSQL "movies"   │
+ subnets     └─────────────────────────────┘        └─────────────────────────────┘
+```
+
+Each arrow is a security group rule: every hop only accepts traffic from the security group of the
+hop before it. The containers get their passwords from AWS Secrets Manager at start-up, and each
+service can only read its own.
+
+| | Staging | Production |
+|---|---|---|
+| VPC | `10.10.0.0/16`, us-east-1a and 1b | `10.20.0.0/16`, us-east-1a and 1b |
+| ECS (Fargate) | 2 tasks per service, 256 CPU units, 512 MB | same |
+| RDS PostgreSQL 15 | 2 x `db.t3.micro`, 20 GB, single-AZ | same |
+| Amazon MQ (RabbitMQ 4.2) | `mq.m7g.medium`, single instance | same |
+| Rolling deploys | minimum 100 %, maximum 200 % healthy | same |
+
+Production is sized like staging to fit the budget. The comment in
+`infra/environments/production/main.tf` records the high-availability sizes (Multi-AZ RDS, clustered
+broker, 4 tasks per service), which are a variable change away.
+
+### 2.2 GitLab platform
+
+```
+ your machine                         AWS default VPC (us-east-1)
+ ┌──────────────────────┐   SSH      ┌──────────────────────────────────────────┐
+ │ terraform            │──────────► │ EC2 t3.large  "code-keeper-gitlab"       │
+ │  ansible/terraform   │            │  GitLab CE 19.5.0 (Omnibus, HTTP :80)    │
+ │ ansible-playbook     │            │  group code-keeper:                      │
+ │  playbooks/site.yml  │            │    infra, api-gateway,                   │
+ │ publish_repos.sh     │──git push─►│    inventory-app, billing-app            │
+ └──────────────────────┘            └──────────────────▲───────────────────────┘
+                                                        │ jobs (HTTP :80)
+                                     ┌──────────────────┴───────────────────────┐
+                                     │ EC2 t3.medium "code-keeper-gitlab-runner"│
+                                     │  gitlab-runner 19.5.0, Docker executor,  │
+                                     │  unprivileged, no Docker socket in jobs  │
+                                     └──────────┬────────────────────┬──────────┘
+                                                │                    │
+                                       Docker Hub (images)    AWS APIs (Terraform, ECS)
+```
+
+### 2.3 Pipeline design
+
+```
+infra:      Init ─► Validate ─► Plan ─► Apply to Staging ─► Approval ─► Apply to Production
+                                                            (manual)
+
+each app:   Build ─► Test ─► Scan ─► Containerization ─► Deploy to Staging ─► Approval ─► Deploy to Production
+            └──────────── CI ──────────────────────┘ └───────────────────── CD ──────────────────────┘
+```
+
+Merge requests run the checks that need no credentials: Validate for infra; Build, Test, Scan and
+an image build without push for the apps. Pushing images, applying Terraform and deploying happen
+only on the protected `main` branch, after the merge.
+
+---
+
+## 3. Directory structure
 
 ```
 code-keeper/
-├── ansible/
-│   ├── ansible.cfg                    # Ansible configuration for this subtree
-│   ├── inventory/
-│   │   └── hosts.ini                # Target servers (gitlab_servers, gitlab_runners)
+├── ansible/                          GitLab and runner, installed with Ansible
+│   ├── ansible.cfg                   uses inventory/aws.ini (written by ansible/terraform)
+│   ├── inventory/hosts.ini           example inventory for hosts not created by the Terraform
 │   ├── playbooks/
-│   │   ├── deploy-gitlab.yml        # Installs and configures GitLab CE omnibus
-│   │   └── deploy-runners.yml       # Installs Docker & registers GitLab Runner
+│   │   ├── site.yml                  everything: deploy-gitlab.yml, then deploy-runners.yml
+│   │   ├── deploy-gitlab.yml         GitLab, settings, group, projects, members, CI/CD variables
+│   │   └── deploy-runners.yml        runner install, registration and verification
 │   ├── roles/
-│   │   ├── gitlab/                  # GitLab CE deployment role
-│   │   │   ├── defaults/main.yml    # Default ports, URLs, backup and admin settings
-│   │   │   ├── handlers/main.yml    # Reconfigure & restart handlers
-│   │   │   ├── tasks/
-│   │   │   │   ├── main.yml         # Role coordinator
-│   │   │   │   ├── install.yml      # Package dependencies and apt repo setup
-│   │   │   │   ├── configure.yml    # Renders gitlab.rb and runs gitlab-ctl reconfigure
-│   │   │   │   └── cicd.yml         # Rails runner configuring branch protection & CI
-│   │   │   └── templates/
-│   │   │       └── gitlab.rb.j2     # Production Omnibus template
-│   │   └── gitlab_runner/           # Runner registration role
-│   │       ├── defaults/main.yml    # Docker executor settings, concurrency, tags
-│   │       ├── handlers/main.yml    # Runner restart handler
-│   │       ├── tasks/
-│   │       │   ├── main.yml         # Role coordinator
-│   │       │   ├── install.yml      # Installs Docker Engine & gitlab-runner package
-│   │       │   ├── register.yml     # Non-interactive CLI runner registration
-│   │       │   └── configure.yml    # Concurrency and systemd daemon management
-│   │       └── templates/
-│   │           └── config.toml.j2   # Runner configuration template
-│   └── scripts/
-│       ├── setup-gitlab.sh          # Helper to execute deploy-gitlab.yml
-│       └── register-runner.sh       # Helper to execute runner registration
-├── infra/
-│   ├── .gitlab-ci.yml               # 6-stage Infrastructure Pipeline
-│   ├── environments/
-│   │   ├── staging/                 # Staging environment definitions
-│   │   │   ├── main.tf              # Module invocations + partial S3 backend for Staging
-│   │   │   ├── backend.hcl          # Partial backend config: bucket/key/DynamoDB lock table
-│   │   │   ├── variables.tf         # Staging variables (cost-optimized, single AZ)
-│   │   │   ├── outputs.tf           # Staging endpoint outputs
-│   │   │   ├── terraform.tfvars     # Environment values
-│   │   │   └── .terraform.lock.hcl  # Pinned provider versions
-│   │   └── production/              # Production environment definitions
-│   │       ├── main.tf              # Identical module invocations for Production
-│   │       ├── backend.hcl          # Partial backend config for the production key
-│   │       ├── variables.tf         # Production variables (Multi-AZ, high replicas)
-│   │       ├── outputs.tf           # Production endpoint outputs
-│   │       ├── terraform.tfvars     # Environment values
-│   │       └── .terraform.lock.hcl  # Pinned provider versions
-│   └── modules/
-│       ├── vpc/                     # VPC, Public/Private/Database subnets, NAT, IGW
-│       ├── security_groups/         # Principle of Least Privilege SG rules
-│       ├── rds/                     # PostgreSQL instances (movies & orders)
-│       ├── rabbitmq/                # Managed Amazon MQ RabbitMQ broker
-│       └── compute/                 # ALB, ECS Cluster, Task Definitions, Services
-├── srcs/                            # Microservice application source code
-│   ├── api-gateway/
-│   │   ├── .gitlab-ci.yml           # 7-stage microservice CI/CD pipeline
-│   │   ├── Dockerfile               # Hardened Alpine image with unprivileged appuser
-│   │   ├── requirements.txt         # Python dependencies
-│   │   ├── pytest.ini               # pytest/coverage configuration
-│   │   ├── server.py                # Waitress production WSGI entrypoint
-│   │   ├── openapi.yaml             # OpenAPI specification
-│   │   ├── app/                     # Reverse proxy & RabbitMQ producer logic
-│   │   └── tests/
-│   │       └── test_gateway.py      # Unit & integration tests
-│   ├── inventory-app/
-│   │   ├── .gitlab-ci.yml           # 7-stage microservice CI/CD pipeline
-│   │   ├── Dockerfile               # Hardened Alpine image with unprivileged appuser
-│   │   ├── requirements.txt         # Python dependencies
-│   │   ├── pytest.ini               # pytest/coverage configuration
-│   │   ├── server.py                # Waitress production WSGI entrypoint
-│   │   ├── app/                     # RESTful movies CRUD & SQLAlchemy models
-│   │   └── tests/
-│   │       └── test_inventory.py    # Comprehensive CRUD & healthcheck tests
-│   └── billing-app/
-│       ├── .gitlab-ci.yml           # 7-stage microservice CI/CD pipeline
-│       ├── Dockerfile               # Hardened Alpine image with unprivileged appuser
-│       ├── requirements.txt         # Python dependencies
-│       ├── pytest.ini               # pytest/coverage configuration
-│       ├── server.py                # Waitress production WSGI entrypoint
-│       ├── app/                     # AMQP consumer worker & orders database handler
-│       └── tests/
-│           └── test_billing.py      # Order validation, model, and endpoint tests
+│   │   ├── gitlab/                   install (pinned), gitlab.rb, settings, projects, variables
+│   │   ├── gitlab_api_token/         short-lived admin API token for the tasks above
+│   │   └── gitlab_runner/            Docker + gitlab-runner (pinned), registration, config.toml
+│   ├── scripts/                      setup-gitlab.sh, register-runner.sh (wrappers)
+│   └── terraform/                    the two EC2 hosts, security groups, Elastic IPs, inventory
+├── infra/                            published as code-keeper/infra
+│   ├── .gitlab-ci.yml                Init, Validate, Plan, Apply to Staging, Approval, Apply to Production
+│   ├── environments/{staging,production}/   main.tf, variables.tf, outputs.tf, terraform.tfvars, backend.hcl
+│   └── modules/{vpc,security_groups,rds,rabbitmq,compute}/
+├── srcs/
+│   ├── api-gateway/                  published as code-keeper/api-gateway
+│   ├── inventory-app/                published as code-keeper/inventory-app
+│   └── billing-app/                  published as code-keeper/billing-app
+│       ├── .gitlab-ci.yml            Build ... Deploy to Production
+│       ├── Dockerfile                Alpine 3.23, non-root appuser, HEALTHCHECK
+│       ├── app/, server.py           the service (Flask on Waitress)
+│       └── tests/                    pytest suites
 ├── scripts/
-│   ├── test_pipelines.sh            # Complete verification and test script
-│   ├── verify_security.sh           # Cybersecurity compliance audit script
-│   └── audit_orchestrator.sh        # Audit harness that fans the checks out to per-item verdicts
-├── docs/
-│   ├── readme.md                    # 01-edu subject requirements (source of truth)
-│   ├── audit.md                     # Auditor checklist and evaluation criteria
-│   └── AUDIT_GUIDE.md               # Audit defense manual & stakeholder Q&A
-├── .github/
-│   └── dependabot.yml               # Dependabot schedule (inert on GitLab; see 7.1)
-├── ansible.cfg                      # Control-node Ansible configuration
-├── .gitignore                       # Guards credentials, .env, tfstate, and artifacts
-└── README.md                        # Implementation documentation and audit answers
+│   ├── publish_repos.sh              pushes each folder to its own GitLab project
+│   ├── test_pipelines.sh             structure, pipelines, scripts, Dockerfiles, unit tests
+│   ├── verify_security.sh            the four cybersecurity guidelines, checked in code
+│   └── audit_orchestrator.sh         every audit question mapped to automated checks
+└── docs/                             brief (readme.md), audit sheet (audit.md), guides
 ```
 
 ---
 
-## 3. Component Walkthrough & Deployment
+## 4. Prerequisites
 
-### 3.1 GitLab CE & Runner Deployment via Ansible
+**On your machine**
 
-#### Prerequisites
-- Ansible `>= 2.14` and Python 3 on the control node.
-- Target Ubuntu/Debian server for GitLab CE and Runner nodes with SSH key access.
+| Tool | Version | Used for |
+|---|---|---|
+| git | 2.x with `git subtree` (part of the Ubuntu and Debian packages) | publishing the four repositories |
+| Terraform | 1.5 or newer (CI uses `hashicorp/terraform:1.6`) | GitLab hosts, and the environments by hand if needed |
+| Ansible | `ansible-core` 2.15 or newer; only built-in modules are used (`sudo apt install ansible-core`) | GitLab and runner |
+| AWS CLI | v2, a profile for the account | bootstrap and checks |
+| SSH key | for example `ssh-keygen -t ed25519 -f ~/.ssh/code-keeper -C code-keeper` | Ansible to both hosts |
 
-#### Target Inventory (`ansible/inventory/hosts.ini`)
-```ini
-[gitlab_servers]
-gitlab-server ansible_host=192.168.56.10 ansible_user=ubuntu ansible_python_interpreter=/usr/bin/python3
+The EC2 hosts need nothing beforehand: Ubuntu 24.04 brings SSH and Python 3.
 
-[gitlab_runners]
-gitlab-runner-01 ansible_host=192.168.56.11 ansible_user=ubuntu ansible_python_interpreter=/usr/bin/python3
-```
+**Accounts**
 
-#### Running Playbooks
-1. **Deploy GitLab Server**:
-   ```bash
-   # Syntax validation
-   ./ansible/scripts/setup-gitlab.sh --syntax-check
+- **AWS**, region `us-east-1`. Both environments together need the paid plan: the AWS Free plan
+  allows at most 2 RDS instances and 1 day of backups, and each environment has 2 databases.
+- **Docker Hub**, with an access token (read and write) and the public repositories `api-gateway`,
+  `inventory-app` and `billing-app`.
 
-   # Execute deployment (root password is read from the environment, never committed)
-   export GITLAB_ROOT_PASSWORD='<SET_ME_IN_YOUR_SHELL_OR_CI_MASKED_VARIABLE>'
-   GITLAB_EXTERNAL_URL="http://gitlab.example.com" \
-   ./ansible/scripts/setup-gitlab.sh --run
-   ```
+---
 
-2. **Deploy & Register GitLab Runner**:
-   ```bash
-   GITLAB_EXTERNAL_URL="http://gitlab.example.com" \
-   GITLAB_RUNNER_TOKEN="<REGISTRATION_TOKEN_FROM_GITLAB>" \
-   ./ansible/scripts/register-runner.sh --ansible
-   ```
+## 5. Setup, first time
 
-#### Auditor Verification Commands
+`docs/AWS_SETUP.md` has the full walkthrough with every command. In short:
+
+### Step 1. AWS bootstrap (once per account)
+
+Create the Terraform state bucket (versioned, encrypted, public access blocked), the DynamoDB lock
+table `code-keeper-tf-locks`, and an IAM user for the pipelines with an access key.
+
+### Step 2. The GitLab hosts
+
 ```bash
-# List all tasks defined in the playbooks
-ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy-gitlab.yml --list-tasks
-ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy-runners.yml --list-tasks
+cd ansible/terraform
+terraform init -backend-config=backend.hcl \
+  -backend-config="bucket=<state bucket>" \
+  -backend-config="region=us-east-1" \
+  -backend-config="dynamodb_table=code-keeper-tf-locks"
+terraform apply -var 'admin_cidrs=["<your public IP>/32"]'
+terraform output gitlab_url
+```
 
-# Verify GitLab services status on target host
-gitlab-ctl status
-systemctl status gitlab-runsvdir
+This creates a `t3.large` for GitLab and a `t3.medium` for the runner (Ubuntu 24.04, encrypted
+40 GB disks, IMDSv2, Elastic IPs) and writes `ansible/inventory/aws.ini`. SSH is only open to
+`admin_cidrs`. GitLab's port 80 is open to `team_cidrs` (default: everyone, since sign-up is
+disabled); narrow it to your team's addresses when you can.
 
-# Verify Runner status on runner host
-gitlab-runner list
-systemctl status gitlab-runner
+### Step 3. GitLab and the runner, with Ansible
+
+```bash
+cd ansible
+export GITLAB_ROOT_PASSWORD='<at least 12 characters>'
+# CI/CD variable values, read from CK_<name>; unset ones are skipped (see section 8.1)
+export CK_AWS_ACCESS_KEY_ID=... CK_AWS_SECRET_ACCESS_KEY=...
+export CK_DOCKERHUB_USERNAME=... CK_DOCKERHUB_TOKEN=... CK_DOCKERHUB_REPO=...
+export CK_TF_STATE_BUCKET=... CK_TF_STATE_REGION=us-east-1 CK_TF_STATE_LOCK_TABLE=code-keeper-tf-locks
+export CK_TF_VAR_inventory_db_password=... CK_TF_VAR_billing_db_password=... CK_TF_VAR_rabbitmq_password=...
+ansible-playbook playbooks/site.yml
+```
+
+The run takes about 15 minutes the first time and is safe to repeat. It:
+
+1. installs GitLab CE `19.5.0-ce.0` and writes `gitlab.rb` (URL, root password, Puma and Sidekiq sizing);
+2. creates a root API token that expires after one day (each run revokes the previous one);
+3. applies the instance settings: sign-up disabled, default branch `main`, default branch protection
+   (push and merge: Maintainers, no force push), shared runners on, Auto DevOps off;
+4. creates the private group `code-keeper` and the projects `infra`, `api-gateway`,
+   `inventory-app`, `billing-app`, each with "pipelines must succeed" and "all threads must be
+   resolved" before merging;
+5. creates the team members listed in `gitlab_team_members` and adds them to the group;
+6. creates or updates the CI/CD variables from the `CK_` values;
+7. installs Docker and gitlab-runner `19.5.0-1`, creates the instance runner through the API, writes
+   `config.toml` with its authentication token, and checks it with `gitlab-runner verify`.
+
+### Step 4. Publish the four repositories
+
+From the repository root, with everything committed:
+
+```bash
+GITLAB_URL=$(terraform -chdir=ansible/terraform output -raw gitlab_url) scripts/publish_repos.sh infra
+```
+
+Wait until the infra pipeline has passed "Apply to Staging", run its manual approval, then publish
+the apps:
+
+```bash
+GITLAB_URL=$(terraform -chdir=ansible/terraform output -raw gitlab_url) \
+  scripts/publish_repos.sh api-gateway inventory-app billing-app
+```
+
+Each push starts that project's pipeline. `--dry-run` shows what would be pushed. The script asks
+for the root password, or uses `GITLAB_PUSH_TOKEN` when set.
+
+### Step 5. First deploy
+
+The first infra apply creates the ECS services with the image tag from `terraform.tfvars`
+(`staging-latest` or `production-latest`), which does not exist yet, so the services start with no
+running tasks. Each app pipeline then deploys its commit-SHA image to staging, and after its manual
+approval to production. Check it:
+
+```bash
+ALB=$(aws elbv2 describe-load-balancers --names code-keeper-staging-alb --query 'LoadBalancers[0].DNSName' --output text)
+curl "http://${ALB}/health"
+curl -X POST "http://${ALB}/api/movies" -H 'Content-Type: application/json' -d '{"title":"Alien","description":"1979"}'
+curl "http://${ALB}/api/movies"
 ```
 
 ---
 
-### 3.2 Infrastructure as Code (Terraform)
+## 6. Usage, day to day
 
-The infrastructure provisions two environments with strict architectural parity:
+1. Work on a branch in one of the four projects and open a merge request.
+2. The merge request pipeline runs the checks. GitLab only allows the merge once it passes and all
+   review threads are resolved.
+3. A Maintainer merges into `main`, which only Maintainers can push to.
+4. The `main` pipeline builds and pushes the image (apps) or plans and applies (infra), and
+   deploys to staging.
+5. A stakeholder checks staging and runs the manual approval job.
+6. Production is updated with a rolling deploy, and the pipeline waits until the services are
+   stable.
 
-| Resource | Staging Environment | Production Environment | Design Rationale |
+**Redeploy everything** (for example before a demo): in each project, Build > Pipelines > Run
+pipeline on `main`, then run the approvals. Run infra first.
+
+**Add a team member**: add them to `gitlab_team_members` in `ansible/roles/gitlab/defaults/main.yml`
+(or in the inventory) and run `ansible-playbook playbooks/deploy-gitlab.yml`. The account gets a
+random password; set one under Admin > Users.
+
+**Change a CI/CD variable**: export the new `CK_` value and run `deploy-gitlab.yml` again.
+
+---
+
+## 7. Pipelines in detail
+
+### 7.1 Infrastructure (`infra/.gitlab-ci.yml`)
+
+| Stage | Job | Runs on | What it does |
 |---|---|---|---|
-| **VPC CIDR** | `10.10.0.0/16` | `10.20.0.0/16` | Non-overlapping CIDRs for VPC peering |
-| **Availability Zones** | `us-east-1a`, `us-east-1b` | `us-east-1a`, `us-east-1b` | High-availability multi-zone distribution |
-| **PostgreSQL RDS** | `db.t3.micro`, Single-AZ, 20GB | `db.t3.small`, Multi-AZ, 50GB | Cost-effective in staging; resilient & scalable in prod |
-| **RabbitMQ Broker** | `mq.t3.micro`, SINGLE_INSTANCE | `mq.m5.large`, CLUSTER_MULTI_AZ | High-throughput clustered broker in production |
-| **ECS Microservices** | 2 replicas each | 4 replicas each (auto-scaling) | Production absorbs peak customer load |
-| **ECS Zero-Downtime** | 100% min / 200% max | 100% min / 200% max | Guarantees zero outage during container updates |
+| Init | `infra:init:staging`, `infra:init:production` | main | `terraform init` against the S3 backend and lock table |
+| Validate | `infra:validate:syntax` | every branch and MR | `terraform fmt -check -recursive`, `terraform validate` for both roots |
+| Validate | `infra:validate:security` | every branch and MR | `trivy config --severity HIGH,CRITICAL --exit-code 1` (accepted findings in `.trivyignore`, each with its reason) |
+| Validate | `infra:validate:dependencies` | main, advisory | provider versions: locked, newest allowed, newest released |
+| Plan | `infra:plan:staging`, `infra:plan:production` | main | `terraform plan -out=<env>.tfplan`, kept as an artifact for the apply |
+| Apply to Staging | `infra:apply:staging` | main, automatic | applies `staging.tfplan` |
+| Approval | `infra:approval:production` | main, **manual**, blocking | the stakeholder's go-ahead |
+| Apply to Production | `infra:apply:production` | main, after the approval | applies the reviewed `production.tfplan` |
 
-#### 6-Stage Infrastructure Pipeline (`infra/.gitlab-ci.yml`)
-1. **`Init`**: Runs `terraform init -input=false` for staging and production backends.
-2. **`Validate`**: Runs `terraform fmt -check` and `terraform validate`, followed by `trivy config` IaC security scans.
-3. **`Plan`**: Generates execution plans (`staging.tfplan` and `production.tfplan`) with changes previewed and saved as artifacts.
-4. **`Apply to Staging`**: Automatically applies changes to the staging environment upon merge to `main`.
-5. **`Approval`**: Manual gate (`when: manual`, `allow_failure: false`). Requires authorized DevOps engineer sign-off to proceed to production.
-6. **`Apply to Production`**: Applies the reviewed `production.tfplan` to the live production environment.
+Init, Plan and Apply need protected variables, which GitLab only passes to protected branches, so
+they run on `main`; merge requests get the credential-free Validate jobs.
 
-#### Local Validation (no AWS account required)
+### 7.2 Microservices (`srcs/<service>/.gitlab-ci.yml`)
 
-The Terraform in this repository is **designed and statically validated, not deployed**. There is no committed state file and no AWS account behind these environments, so the following commands are the reproducible evidence of correctness; a live `terraform plan`/`apply` additionally requires `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` (or an instance role) and a real `us-east-1` account.
+| Stage | Job | Runs on | What it does |
+|---|---|---|---|
+| Build | `build:package` | every branch and MR | installs the requirements, `python3 -m compileall`, keeps `requirements.txt` (and the gateway's `openapi.yaml`) |
+| Test | `test:unit` | every branch and MR | `pytest` with coverage and a JUnit report |
+| Scan | `scan:sast_bandit` | every branch and MR | Bandit static analysis, blocking on medium or higher |
+| Scan | `scan:secret_detection` | every branch and MR | Gitleaks |
+| Scan | `scan:trivy_fs` | every branch and MR | Trivy on the code and dependencies, blocking on HIGH and CRITICAL |
+| Scan | `scan:sonarqube` | every branch and MR | SonarQube, when `SONAR_HOST_URL` and `SONAR_TOKEN` are set |
+| Scan | `scan:dependencies` | every pipeline, also scheduled | `pip-audit`, advisory |
+| Containerization | `containerize:docker` | MR (build only) and main (build and push) | Kaniko, unprivileged, pushes `docker.io/<repo>/<service>:<commit SHA>` |
+| Containerization | `containerize:image_scan` | main | `trivy image` on the pushed image, blocking |
+| Deploy to Staging | `deploy:staging` | main | checks the image exists, registers a task definition revision with it, `aws ecs update-service`, waits for `services-stable`, and for the gateway probes `/health` through the ALB |
+| Approval | `approval:production` | main, **manual**, blocking | the stakeholder's go-ahead |
+| Deploy to Production | `promote:image` | main, after the approval | copies the SHA tag to `production-latest` in the registry (crane, no Docker daemon) |
+| Deploy to Production | `deploy:production` | main, after the approval | the same rolling update on the production cluster, then the health checks |
 
-Run from the repository root. Use `-backend=false` for offline validation so Terraform does not try to reach the S3 state bucket; the remote backend is configured separately via `-backend-config=backend.hcl`.
+Job names start with the service name, for example `api-gateway:deploy:staging`.
 
-```bash
-# Formatting (whole tree, read-only check)
-terraform fmt -check -recursive infra/
+**Zero downtime.** ECS starts the new tasks first (maximum 200 %), waits until they pass the
+container health check and the load balancer health check, and only then stops the old ones
+(minimum 100 %). The job waits for `services-stable`, so it fails if the new tasks do not become
+healthy.
 
-# Static validation of both environment roots, offline
-for env in staging production; do
-  ( cd "infra/environments/${env}" \
-    && terraform init -backend=false -input=false \
-    && terraform validate )
-done
-```
-
-Both roots currently report `Success! The configuration is valid.` To initialise against real remote state instead, drop `-backend=false` and supply the partial backend:
-
-```bash
-( cd infra/environments/staging \
-  && terraform init -backend-config=backend.hcl \
-  && terraform plan )
-```
-
-`backend.hcl` carries the bucket, key, region, DynamoDB lock table, and `encrypt = true`; the roots declare only `backend "s3" {}`, so no state location or credential is committed.
-
-#### Running the Microservice Test Suites
-
-`pytest` is not assumed to be on the control node's `PATH` and the application dependencies are not installed globally, so install them into an ephemeral `uv` environment rather than invoking `python3 -m pytest`. Note the `srcs/` prefix — the applications are subdirectories of this repository, not repository roots.
-
-```bash
-for app in api-gateway inventory-app billing-app; do
-  ( cd "srcs/${app}" \
-    && uv run --with pytest --with pytest-cov \
-              --with-requirements requirements.txt \
-              pytest -q )
-done
-```
-
-Each service carries its own `pytest.ini`, so coverage and test paths resolve correctly from inside its directory. All three suites currently pass; read the per-suite summary line pytest prints for the exact counts.
+**Image tags.** Every image is tagged with its commit SHA, which never changes. `production-latest`
+is only a record of what production runs; deploys always point ECS at the SHA tag.
 
 ---
 
-### 3.3 Microservices CI/CD Pipelines
+## 8. Configuration reference
 
-Each microservice (`api-gateway`, `inventory-app`, `billing-app`) operates an independent pipeline with 7 stages:
+### 8.1 CI/CD variables
 
-1. **`Build`**: Installs dependencies and compiles Python bytecode (`python3 -m compileall -b .`) to verify packaging integrity.
-2. **`Test`**: Executes unit and integration test suites with `pytest` and generates code coverage and JUnit XML reports.
-3. **`Scan`**:
-   - **SAST**: `bandit -r app/` scans Python AST for insecure patterns.
-   - **Secret Scanning**: `gitleaks` checks for exposed API keys, private keys, or passwords.
-   - **Filesystem / Dependency Scanning**: `trivy fs --severity HIGH,CRITICAL .` checks for CVEs.
-   - **Code Quality**: `sonar-scanner-cli` analyzes code quality and security gates.
-4. **`Containerization`**: Builds the Docker image in a `docker:24.0.5` job with a `docker:24.0.5-dind` service, scans the built image with `trivy image`, then pushes two tags to the registry: the immutable `${CI_COMMIT_SHORT_SHA}` and the mutable `staging-latest`. The build is single-architecture (plain `docker build`, no `buildx`/`--platform`).
-5. **`Deploy to Staging`**: Triggers rolling deployment on AWS ECS Staging cluster and performs automated HTTP `/health` smoke test.
-6. **`Approval`**: Manual approval gate (`when: manual`) ensuring stakeholder review before production rollout.
-7. **`Deploy to Production`**: Waits on `approval:production`, then runs `aws ecs update-service --force-new-deployment` against the production service (`minimumHealthyPercent=100`, `maximumPercent=200`), blocks on `aws ecs wait services-stable`, and probes the service health endpoint. The deployment promotes the immutable SHA tag that was already pushed in `Containerization`; no `production-latest` tag is pushed by the pipeline. Because the pipeline targets `staging.code-keeper.internal` / `production.code-keeper.internal`, which are not publicly resolvable names, the health `curl` only succeeds from inside the VPC.
+Ansible creates them from `CK_<name>` environment variables on the machine that runs it. They are
+never written to the repository.
 
-### 3.4 Monorepo Path-Gating (Simulated Service Independence)
+| Variable | Level | Protected | Masked | Used by |
+|---|---|---|---|---|
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | group | yes | yes | Terraform, ECS deploys |
+| `DOCKERHUB_USERNAME` | group | yes | no | image push, image scan, ECS image pulls |
+| `DOCKERHUB_TOKEN` | group | yes | yes | same |
+| `DOCKERHUB_REPO` | group | no | no | image names (`docker.io/<repo>/<service>`) |
+| `TF_STATE_BUCKET`, `TF_STATE_REGION`, `TF_STATE_LOCK_TABLE` | project `infra` | yes | no | Terraform backend |
+| `TF_VAR_inventory_db_password`, `TF_VAR_billing_db_password`, `TF_VAR_rabbitmq_password` | project `infra` | yes | yes | RDS and Amazon MQ passwords, stored in Secrets Manager for the tasks |
 
-This repo is a monorepo, but each pipeline behaves like an independent repo via
-`rules:changes:paths`: `infra/**/*` gates Init/Validate/Plan, and
-`srcs/api-gateway/**/*`, `srcs/inventory-app/**/*`, `srcs/billing-app/**/*` gate the matching
-service's Build/Test/Scan jobs. Deploys stay `main`-only. All four pipelines are
-`main`-only via `workflow:rules: - if: $CI_COMMIT_BRANCH == "main" / - when: never`,
-so no merge-request pipeline is created; see
-[Known deviations from the brief](#known-deviations-from-the-brief).
+Optional: `SONAR_HOST_URL` and `SONAR_TOKEN` (group) switch on the SonarQube upload.
 
-Upstream mapping (crud-master / cloud-design): service names and variables
-mirror the sibling projects — `APP_NAME` (`api-gateway`, `inventory-app`,
-`billing-app`), Postgres DBs `movies` (inventory) / `orders` (billing),
-`RABBITMQ_QUEUE=billing_queue`, ECS cluster `code-keeper-<env>-cluster` and
-services `code-keeper-<env>-<app>` (see `infra/modules/compute/main.tf`),
-health endpoint `/health` (`:3000` gateway, `:8080` inventory/billing).
+### 8.2 Ansible
 
----
+| Setting | Where | Default |
+|---|---|---|
+| `GITLAB_ROOT_PASSWORD` | environment, required | none |
+| `CK_<variable>` | environment, optional | unset values are skipped |
+| `gitlab_external_url` | inventory (`aws.ini`) | `http://<GitLab Elastic IP>` |
+| `gitlab_version` / `gitlab_runner_version` | role defaults | `19.5.0-ce.0` / `19.5.0-1`; upgrade both together, one step of GitLab's upgrade path at a time |
+| `gitlab_projects`, `gitlab_group_path` | `roles/gitlab/defaults/main.yml` | the four projects in `code-keeper` |
+| `gitlab_team_members` | same | empty; Developer (30) unless `access_level: 40` |
+| `gitlab_default_branch_push_access_level` / `..._merge_access_level` | same | 40 (Maintainer) |
+| `gitlab_runner_tags`, `gitlab_runner_concurrent` | `roles/gitlab_runner/defaults/main.yml` | `docker, shared, ci-cd, linux`; 4 |
+| `gitlab_runner_docker_privileged` | same | `false` |
 
-## 4. Cybersecurity Compliance & Best Practices
+### 8.3 Terraform for the GitLab hosts (`ansible/terraform/variables.tf`)
 
-The platform enforces the 4 mandatory cybersecurity pillars:
+| Variable | Default | Notes |
+|---|---|---|
+| `admin_cidrs` | required | your address(es) for SSH; `0.0.0.0/0` is refused |
+| `team_cidrs` | `["0.0.0.0/0"]` | who can reach GitLab on port 80 and Git over SSH |
+| `gitlab_instance_type` / `runner_instance_type` | `t3.large` / `t3.medium` | GitLab needs at least 8 GB of memory |
+| `ssh_public_key_path` / `ssh_private_key_path` | `~/.ssh/code-keeper.pub` / `~/.ssh/code-keeper` | |
 
-### 4.1 Restrict Triggers to Protected Branches
-- All CD jobs (`containerize:docker`, `deploy:staging`, `approval:production`, `deploy:production`, `apply:staging`, `apply:production`) are locked to the protected `main` branch using GitLab CI rules:
-  ```yaml
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-  ```
-- Pushes to `main` are restricted to Maintainers and force-push is disabled. This is applied by `ansible/roles/gitlab/tasks/cicd.yml`, which sets `default_branch_protection_defaults` with `allowed_to_push => Gitlab::Access::MAINTAINER` and `allow_force_push => false`. Two honest caveats: `allowed_to_merge` is set to `Gitlab::Access::DEVELOPER`, so developers **can** merge into `main`; and the `gitlab_default_branch_protection: 2` key in `ansible/roles/gitlab/defaults/main.yml` is currently declared but not consumed by any task, so it has no effect on the running instance.
+### 8.4 Environments (`infra/environments/<env>/terraform.tfvars`)
 
-### 4.2 Separate Credentials from Code
-- Zero plaintext credentials or tokens in git repositories.
-- AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`), database passwords, and registry tokens are configured as **Masked & Protected Variables** in GitLab CI/CD settings.
-- Repository `.gitignore` prevents inadvertent commits of `.env`, `*.tfstate`, `*.pem`, `*.key`, and build artifacts.
-- Automated secret detection with `gitleaks` runs on every commit.
-
-### 4.3 Apply the Least Privilege Principle
-- **Container Isolation**: Dockerfiles execute as an unprivileged, non-root user (`USER appuser`, UID `10001`).
-- **Network Micro-segmentation**:
-  - The ALB security group permits inbound 80 and 443 from `0.0.0.0/0`, but `infra/modules/compute/main.tf` defines only an `aws_lb_listener.http` on port 80 — TLS termination is not yet configured (no ACM certificate, no HTTPS listener), so only HTTP is actually served.
-  - API Gateway accepts port 3000 **only** from the ALB security group.
-  - Inventory App accepts port 8080 **only** from the API Gateway security group.
-  - PostgreSQL RDS instances accept port 5432 **only** from Inventory and Billing security groups (strictly 0.0.0.0/0 forbidden).
-  - RabbitMQ AMQP port 5672 accepts traffic **only** from API Gateway and Billing App security groups.
-- **IAM Minimization**: ECS tasks assume designated execution roles scoped solely to CloudWatch logging and ECR image pull.
-
-### 4.4 Update Dependencies and Tools Regularly
-- Multi-tier automated security scanners integrated into CI pipelines:
-  - `trivy fs` and `trivy image` for container and dependency vulnerabilities.
-  - `bandit` for AST-level application security scanning.
-  - Dependabot configuration for the `pip`, `terraform` and `docker` ecosystems is committed at `.github/dependabot.yml`, with the `terraform` entries pointed at the directories that actually contain a `.terraform.lock.hcl` (`infra/environments/staging` and `infra/environments/production`); it is currently inert because the project is hosted on GitLab, where `.github/` automation does not execute (see [§7.1](#71-considered-but-not-implemented)).
-  - Base Docker images built from stable Alpine Linux releases (`alpine:3.23`).
+Region, VPC and subnet ranges, availability zones, and `release_tag`, the image tag for the very
+first task definitions only (see step 5).
 
 ---
 
-## 5. Verification & Test Execution
+## 9. Security
 
-Run the provided verification scripts to audit all pipelines and security controls:
+### Restrict triggers to protected branches
+
+- `main` is protected in every project: only Maintainers push or merge, and force pushes are refused.
+  Ansible sets this as the instance default for new projects.
+- Every job that pushes images, applies Terraform or deploys has a `main`-only rule.
+- The deploy credentials are protected variables, so GitLab gives them only to pipelines on protected
+  branches. A pipeline on any other branch could not deploy even if its rules were changed.
+- Merge request pipelines run the checks without credentials, and a merge needs a passing pipeline.
+
+### Separate credentials from code
+
+- No credential is committed. CI/CD variables (masked where possible) carry the secrets; Ansible
+  reads them from the operator's environment, and `GITLAB_ROOT_PASSWORD` the same way.
+- Terraform receives passwords as `TF_VAR_*` and stores them in AWS Secrets Manager. ECS injects
+  each one into the container that needs it, and the variables are marked `sensitive`.
+- The Ansible admin token is generated on each run, passed to GitLab through the environment and
+  expires after one day. The runner's authentication token only lives in `config.toml` (mode 600).
+  No legacy registration token is used.
+- Gitleaks runs in every app pipeline, and `.gitignore` keeps state, plans, keys and `.env` files out.
+
+### Apply the least privilege principle
+
+- The runner is unprivileged and jobs get no Docker socket; images are built with Kaniko.
+- Containers run as the non-root `appuser` (UID 10001).
+- Network: every security group hop only accepts the hop before it, the databases only accept their
+  own service, and nothing but the ALB is reachable from the internet.
+- The ECS execution role may read only this environment's secrets.
+- GitLab hosts: SSH only from `admin_cidrs`, the runner accepts nothing else, IMDSv2 only, encrypted
+  disks. GitLab: sign-up disabled, private group, team members are Developers unless set otherwise,
+  infra-only variables live on the infra project instead of the group.
+- Known gap: the pipelines' IAM user has `AdministratorAccess`. See section 12.
+
+### Update dependencies and tools regularly
+
+- Versions are pinned so updates are deliberate and reviewable: GitLab and the runner, Terraform
+  providers (`.terraform.lock.hcl`), Python packages (`requirements.txt`), Kaniko, crane (by
+  digest), and the scanners installed with pip. The Trivy, Gitleaks, SonarQube and AWS CLI images
+  still use `:latest` (section 12).
+- Advisories are checked on every pipeline: Trivy on code, dependencies, images and Terraform,
+  Bandit, Gitleaks and `pip-audit`. `scan:dependencies` also runs on scheduled pipelines, so new
+  advisories against unchanged code are reported. Create a schedule per project under
+  Build > Pipeline schedules.
+- `infra:validate:dependencies` compares the locked provider versions with the newest ones the
+  constraints allow and the newest released, on every `main` pipeline.
+- `.github/dependabot.yml` describes the update policy for pip, Terraform and Docker. GitLab does not
+  run it; Renovate would be the GitLab equivalent.
+
+---
+
+## 10. Verification and audit commands
+
+**Locally, no cloud needed**
 
 ```bash
-# 1. Validate all pipelines, Ansible playbooks, and Dockerfiles
-./scripts/test_pipelines.sh
-
-# 2. Verify cybersecurity compliance, branch protection, and least-privilege rules
-./scripts/verify_security.sh
+scripts/test_pipelines.sh        # structure, the four standalone pipelines, Dockerfiles, unit tests
+scripts/verify_security.sh       # the four cybersecurity guidelines, checked in code
+scripts/audit_orchestrator.sh    # every audit question mapped to automated checks
 ```
 
-### Verification Script Output
+**Ansible**
 
-Both scripts print one `[PASS]`/`[FAIL]` line per assertion and close with a summary block. Read the totals from that summary block rather than from any number quoted here — the assertion count changes whenever a check is added, and both scripts are actively maintained.
-
-```text
-============================================================
-  CODE-KEEPER PIPELINE & INFRASTRUCTURE TEST SUITE
-============================================================
-  [PASS] <check name>
-  ...
-============================================================
-  Total Assertions Passed: <N>
-  >>> ALL CODE-KEEPER PIPELINE TESTS PASSED! <<<
-
-============================================================
-  CODE-KEEPER CYBERSECURITY AUDIT & VERIFICATION
-============================================================
-  [PASS] <control name>
-  ...
-  CYBERSECURITY AUDIT SUMMARY
-  Controls Passed: <N>
-  Controls Failed: 0
-  >>> ALL CYBERSECURITY COMPLIANCE CONTROLS PASSED! <<<
+```bash
+cd ansible
+ansible-playbook playbooks/site.yml --list-tasks
+ansible-playbook playbooks/site.yml --syntax-check
+ansible all -m ping
 ```
 
-A `[FAIL]` line in either output is the signal to act: both scripts exit non-zero when any assertion fails, so they are usable as local gates and as CI checks.
+**On the GitLab host** (`terraform -chdir=ansible/terraform output -raw ssh_gitlab`)
+
+```bash
+sudo gitlab-ctl status
+systemctl status gitlab-runsvdir
+sudo gitlab-rake gitlab:env:info
+```
+
+**On the runner host** (`terraform -chdir=ansible/terraform output -raw ssh_runner`)
+
+```bash
+systemctl status gitlab-runner
+sudo gitlab-runner list
+sudo gitlab-runner verify
+```
+
+In GitLab: Admin > CI/CD > Runners shows the runner online, and each project's
+Build > Pipelines shows its pipelines and the jobs the runner executed.
 
 ---
 
-## 6. Audit & Stakeholder Role-Play Q&A Guide
+## 11. Costs and teardown
 
-Below are direct, comprehensive answers to the questions listed in [`docs/audit.md`](docs/audit.md) for the stakeholder interview. The full defense manual lives in [`docs/AUDIT_GUIDE.md`](docs/AUDIT_GUIDE.md), and the original 01-edu subject requirements are preserved in [`docs/readme.md`](docs/readme.md):
+On-demand prices in us-east-1, roughly:
+
+| What | Cost while running |
+|---|---|
+| Staging and production together (Fargate, 4 RDS, 2 brokers, 2 NAT gateways, 2 ALBs) | about $0.79 an hour |
+| GitLab hosts (`t3.large` + `t3.medium`, disks, 2 public IPs) | about $0.14 an hour |
+
+When you are done, tear down in this order (the state bucket and lock table can stay):
+
+```bash
+# each environment, production first (with the same -backend-config flags as in step 2)
+cd infra/environments/production && terraform init -backend-config=backend.hcl ... && terraform destroy
+cd ../staging && terraform init -backend-config=backend.hcl ... && terraform destroy
+# the GitLab hosts
+terraform -chdir=ansible/terraform destroy -var 'admin_cidrs=["<your public IP>/32"]'
+```
+
+`docs/AWS_SETUP.md` lists the checks for anything billable left behind.
+
+---
+
+## 12. Known limitations
+
+- **No TLS.** There is no domain, so there is no certificate: the ALB and GitLab serve plain HTTP.
+  Logins to GitLab cross the internet unencrypted, which is why `team_cidrs` should be narrowed. The
+  accepted Trivy findings in `infra/.trivyignore` say the same.
+- **Plan artifacts contain secrets.** `<env>.tfplan` holds the variable values, and project members
+  can download it for 7 days.
+- **Some images use `latest`**: Trivy, the AWS CLI, Gitleaks and the SonarQube scanner.
+- **SonarQube is not configured**, so that job skips the upload unless the two variables are set.
+- **The pipelines' IAM user has `AdministratorAccess`.** A policy limited to the services Terraform
+  manages (VPC, EC2, ECS, RDS, MQ, ELB, IAM roles, Secrets Manager, CloudWatch Logs, S3 and DynamoDB
+  for state) would be tighter.
+- **Production is sized like staging**, and RDS keeps 1 day of backups (the Free plan's maximum;
+  the paid plan allows up to 35).
+
+---
+
+## 13. Role-play questions
+
+Short answers to the questions in `docs/audit.md`. `docs/AUDIT_GUIDE.md` has the long versions.
 
 ### Q1: Can you explain the concept of DevOps and its benefits for the software development lifecycle?
-**Answer**: DevOps is a cultural and technical methodology that bridges the gap between software development (Dev) and IT operations (Ops). By introducing continuous collaboration, automated testing, continuous integration, and automated deployment, DevOps shortens the development life cycle, increases deployment frequency, reduces change failure rates, and accelerates time-to-market while ensuring high quality and system reliability.
+
+DevOps puts development and operations on one delivery process, automated end to end: small
+changes, tested and shipped often, with fast feedback. The result is shorter lead times, fewer
+failed releases and faster recovery when something does break.
 
 ### Q2: How do DevOps principles help improve collaboration between development and operations teams?
-**Answer**: DevOps eliminates departmental silos through shared responsibility, common metrics, and unified tooling. Developers write code that conforms to containerized environments identical to production, while operations engineers provide automated CI/CD pipelines, reusable Infrastructure as Code (IaC) modules, and observability tools. Both teams collaborate via version control, automated approval gates, and blameless post-mortems.
+
+Both work from the same repositories and the same pipeline. Developers see the production rules
+(scans, approval, deploy) in `.gitlab-ci.yml`; operations changes go through merge requests in the
+`infra` project like any other code change, reviewed by the same people.
 
 ### Q3: What are some common DevOps practices, and how did you incorporate them into your project?
-**Answer**:
-- **Continuous Integration (CI)**: Microservice pipelines automatically build bytecode, run unit tests, and perform SAST/container security scanning on every push.
-- **Continuous Deployment (CD)**: Automated deployments to staging followed by gated zero-downtime rolling updates to production.
-- **Infrastructure as Code (IaC)**: Terraform manages all networking, database, messaging, and compute resources across staging and production environments.
-- **Configuration Management**: Ansible automates the deployment and configuration of the GitLab server and GitLab Runners.
-- **DevSecOps**: Multi-layer security scanning (Trivy, Bandit, Gitleaks) built directly into the CI pipeline.
+
+Version control for everything, CI on every merge request, CD with a manual production gate,
+infrastructure as code (Terraform), configuration management (Ansible), security scanning inside
+the pipeline, and immutable images tagged with their commit.
 
 ### Q4: How does automation play a key role in the DevOps process, and what tools did you use to automate different stages of your project?
-**Answer**: Automation eliminates manual human error, ensures repeatability, accelerates cycle times, and enforces compliance. In this project:
-- **Ansible**: Automates host provisioning, package installation, and service configuration for GitLab and Runners.
-- **Terraform**: Automates cloud infrastructure creation and lifecycle management.
-- **GitLab CI/CD**: Automates testing, scanning, container packaging, and deployment orchestration.
-- **Docker**: Automates runtime packaging into consistent, immutable container images.
 
-### Q5: Can you discuss the role of CI/CD in a DevOps workflow, and how it helps improve the quality and speed of software delivery?
-**Answer**: CI continuously integrates code changes into a shared repository several times a day, catching bugs early via automated tests and scans. CD ensures that validated code can be deployed to staging and production automatically or at the press of a button. This feedback loop reduces integration conflicts, guarantees artifact reproducibility, and enables organizations to deliver features to customers in minutes rather than weeks.
+Automation makes every run identical and removes manual steps that go wrong. Terraform creates the
+cloud resources, Ansible installs and configures GitLab and the runner, GitLab CI builds, tests,
+scans and deploys, Kaniko packages the services, crane promotes images, and the AWS CLI rolls ECS.
 
-### Q6: Can you explain the importance of Infrastructure as Code (IaC) in a DevOps environment, and how it helps maintain consistency and reproducibility in your project?
-**Answer**: IaC treats infrastructure definitions as software code. It eliminates configuration drift, enables version tracking in git, supports peer review via pull requests, and allows environments to be torn down and recreated identically on demand. In this project, `infra/environments/staging` and `infra/environments/production` use the exact same modular blueprints, preventing discrepancies between staging tests and production deployments.
+### Q5: Can you discuss the role of continuous integration and continuous deployment (CI/CD) in a DevOps workflow, and how it helps improve the quality and speed of software delivery?
+
+CI catches problems on the merge request, before they reach `main`. CD makes every merge a
+deployable release: staging automatically, production after one approval. Quality goes up because
+nothing skips the checks, and speed goes up because nothing waits for a manual release process.
+
+### Q6: Can you explain the importance of infrastructure as code (IaC) in a DevOps environment, and how it helps maintain consistency and reproducibility in your project?
+
+Both environments are the same Terraform modules with different variables, so staging really is a
+replica of production. Every change is reviewed in a merge request, planned before it is applied,
+and the whole environment can be destroyed and rebuilt from the code.
 
 ### Q7: How do DevOps practices help improve the security of an application, and what steps did you take to integrate security into your development and deployment processes?
-**Answer**: Security is "shifted left" into the development cycle (DevSecOps):
-1. Pipelines run automated static analysis (`bandit`), secret scanning (`gitleaks`), and vulnerability scanning (`trivy`).
-2. Production deployments require manual approval gates from authorized operators.
-3. Deployment jobs only trigger on protected branches (`main`).
-4. Credentials are separated into masked GitLab environment variables, preventing secrets from entering version control.
-5. Least privilege is enforced at the network (Security Groups) and container level (non-root `appuser`).
+
+Security checks run on every change instead of once before a release. Here: protected `main` and
+protected variables, merge request pipelines without credentials, scanners in every pipeline,
+non-root containers, least-privilege network rules, and a manual gate before production.
 
 ### Q8: What challenges did you face when implementing DevOps practices in your project, and how did you overcome them?
-**Answer**:
-- **Challenge 1: Zero-Downtime Deployments**: Solved by configuring AWS ECS rolling deployments with `minimumHealthyPercent = 100` and `maximumPercent = 200`, ensuring new containers pass health checks before old containers are drained and decommissioned.
-- **Challenge 2: Environment Parity vs Cost**: Staging must mirror production architecture but remain cost-effective. Solved by parameterizing Terraform modules (e.g., Single-AZ `db.t3.micro` for staging vs Multi-AZ `db.t3.small` for production).
-- **Challenge 3: Multi-Service Asynchronous Communication**: The API Gateway forwards billing orders asynchronously via RabbitMQ to decouple load spikes from database write pressure.
+
+AWS Free plan limits on RDS (2 instances, 1 day of backups), which the paid plan lifted; image
+builds without a Docker daemon on an unprivileged runner (Kaniko); the plain `crane` images having
+no shell for GitLab (the pinned debug image); GitLab 17+ disabling registration tokens (runners are
+now created through the API); and splitting one repository into four independent pipelines.
 
 ### Q9: How can DevOps practices help optimize resource usage and reduce costs in a cloud-based environment?
-**Answer**: IaC allows non-production environments to be scheduled, scaled down, or destroyed when not in use. Automated CI/CD enables rightsizing and auto-scaling based on real workloads: the Terraform modules in `infra/` take instance classes, replica counts, and multi-AZ flags as variables, so the same blueprint can be sized down for staging (`db.t3.micro`, single-AZ, 2 replicas) or up for production (`db.t3.small`, multi-AZ, 4 replicas). Cost-estimate tooling such as Infracost was evaluated but is **not integrated** — the `Plan` stage of `infra/.gitlab-ci.yml` runs `terraform plan` only. Adding shift-left cost visibility remains an open improvement.
+
+The sizes are variables, so staging can stay small; everything can be destroyed and recreated from
+code, so nothing has to run between sessions; Fargate bills per running task; and the GitLab hosts
+can be stopped or destroyed when not in use.
 
 ### Q10: Can you explain the purpose and benefits of using GitLab and GitLab Runners in your project, and how they improve the development and deployment processes?
-**Answer**: GitLab provides an all-in-one DevOps platform housing git repositories, issue tracking, container registry, and CI/CD pipelines in a unified interface. GitLab Runners execute pipeline jobs in isolated Docker containers, allowing elastic scaling of build workloads, distributed caching, and clean execution environments for every commit.
+
+GitLab holds the repositories, merge requests, CI/CD variables and pipeline history in one place.
+The runner executes every job in a clean container on its own host, so builds never touch the
+GitLab server and can be scaled by adding runners.
 
 ### Q11: What are the advantages of using Ansible for automation in your project, and how did it help you streamline the deployment of GitLab and GitLab Runners?
-**Answer**: Ansible is agentless, idempotent, and uses human-readable YAML playbooks. It connects via standard SSH to configure the OS, manage dependencies, deploy templates (`gitlab.rb.j2`, `config.toml.j2`), and restart services. This eliminated manual server configuration steps, ensuring GitLab and Runner hosts can be rebuilt deterministically in minutes.
+
+Ansible is agentless (only SSH and Python on the hosts), idempotent and readable. One command
+rebuilds GitLab with the same version and settings, and it also configures GitLab itself (settings,
+projects, merge rules, variables, runner) through the API.
 
 ### Q12: Can you explain the concept of Infrastructure as Code (IaC) and how you implemented it using Terraform in your project?
-**Answer**: We structured the Terraform configuration into reusable modules (`vpc`, `security_groups`, `rds`, `rabbitmq`, `compute`) consumed by two environment roots (`staging` and `production`). Each environment defines its state, variables, and tags. Terraform calculates dependency graphs, presents execution plans (`terraform plan`), and executes declarative updates (`terraform apply`) with state locking.
+
+IaC describes the infrastructure in versioned files instead of console clicks. Terraform modules
+for the VPC, security groups, RDS, Amazon MQ and ECS are used by two root modules, one per
+environment, with remote state in S3 and DynamoDB locking, and a saved plan that the apply uses.
 
 ### Q13: What is the purpose of using continuous integration and continuous deployment (CI/CD) pipelines, and how did it help you automate the building, testing, and deployment of your application?
-**Answer**: CI/CD pipelines automate the tedious, error-prone manual steps of packaging software, validating tests, scanning code for vulnerabilities, and pushing containers to servers. In this project, any commit to the repository automatically triggers compilation, test execution, security scans, container image publishing, and staging rollout without manual developer intervention.
+
+Every change is built, tested, scanned, packaged and deployed the same way, with a record of who
+approved what. A merge to `main` is all it takes to get a change to staging, and one approval
+takes it to production.
 
 ### Q14: How did you ensure the security of the application throughout the pipeline stages?
-**Answer**: Through a defense-in-depth approach across all 7 pipeline stages:
-- **Pre-commit / Commit**: Branch protection restricts write access to maintainers.
-- **Build / Test**: Clean containerized environments run isolated unit tests.
-- **Scan**: Automated static application security testing (`bandit`), secret detection (`gitleaks`), and filesystem CVE scanning (`trivy`).
-- **Containerization**: Trivy scans container layers for base OS vulnerabilities.
-- **CD / Production**: Manual approval gate requires stakeholder review; cloud credentials remain masked in GitLab secret storage.
+
+Build and Test run in clean containers; Scan runs Bandit, Gitleaks, Trivy and pip-audit;
+Containerization builds without privileges and Trivy scans the pushed image; deploys need
+protected variables that only `main` gets; production needs a manual approval. Section 9 has the
+details.
 
 ### Q15: Can you explain the continuous integration (CI) pipeline you've implemented for each repository?
-**Answer**: The CI pipeline consists of 4 stages:
-1. **`Build`**: Installs dependencies and compiles Python bytecode to verify syntax and packaging.
-2. **`Test`**: Runs unit and integration tests using pytest, measuring code coverage and producing JUnit test reports.
-3. **`Scan`**: Executes Bandit (SAST), Gitleaks (secret detection), and Trivy (filesystem CVEs).
-4. **`Containerization`**: Builds the hardened Docker image, scans it for vulnerabilities, and pushes it with the commit SHA and latest tags to the GitLab container registry.
+
+Build (install and compile), Test (pytest with coverage), Scan (Bandit, Gitleaks, Trivy,
+SonarQube, pip-audit) and Containerization (Kaniko build and push with the commit SHA tag, then a
+Trivy image scan). Section 7.2 lists every job.
 
 ### Q16: Can you explain the continuous deployment (CD) pipeline you've implemented for each repository?
-**Answer**: The CD pipeline consists of 3 stages:
-1. **`Deploy to Staging`**: Deploys the container to the staging ECS service and executes an automated health check probe.
-2. **`Approval`**: Pauses pipeline execution behind a manual gate requiring stakeholder authorization before production rollout.
-3. **`Deploy to Production`**: Executes a zero-downtime rolling update on the production ECS service, verifies the live health check, and promotes the release tag.
 
-### Known deviations from the brief
-
-[`docs/readme.md`](docs/readme.md) asks for three things this repository does not deliver literally. Disclosed here rather than papered over:
-
-| Brief requirement | What is delivered instead | Impact if split into separate repos |
-|---|---|---|
-| Infra config "must exist in an independent repository" (`docs/readme.md:130-131`) | `infra/` is a subdirectory of this same GitLab project (single remote `platform.zone01.gr/git/ekaramet/code-keeper.git`; no nested `.git`) | `infra/.gitlab-ci.yml` uses project-root-relative paths — `cd infra/environments/staging`, `artifacts: infra/environments/staging/.terraform`, `rules:changes: infra/**/*` — which resolve only from this repo root and would need rewriting to be standalone |
-| CI "triggered on every code push or pull request" (`docs/readme.md:161`) | All four `.gitlab-ci.yml` files gate on `workflow:rules: - if: $CI_COMMIT_BRANCH == "main" / - when: never`, so pipelines run on pushes to `main` only; no merge-request pipeline is created | Feature branches get no CI feedback before merge; `rules:changes:paths` mitigates this for touched paths only |
-| "Each application must exist in a single repository" (`docs/readme.md:116`) | `api-gateway`, `inventory-app`, and `billing-app` are three subdirectories of one GitLab project, each with its own `.gitlab-ci.yml` | Per-service pipelines are logically independent but share one project's permissions, registry, and runner pool |
-
-The compensating control is documented in [§3.4](#34-monorepo-path-gating-simulated-service-independence): `rules:changes:paths` scoping keeps each service's pipeline independent inside the monorepo.
+Deploy to Staging (new task definition revision with the SHA image, rolling update, wait until
+stable, health check), Approval (manual, blocking), Deploy to Production (promote the image, the
+same rolling update on production). For the infrastructure: Apply to Staging, Approval, Apply to
+Production with the reviewed plan.
 
 ---
 
-## 7. Bonus Implementations
+## 14. Bonus
 
-- **Infrastructure Security Scanning**: The `Validate` stage of `infra/.gitlab-ci.yml` runs `trivy config --severity HIGH,CRITICAL --exit-code 1 infra/` as a blocking IaC scan of the Terraform code.
-- **Automated Verification Framework**: Custom automated verification test suites (`scripts/test_pipelines.sh` and `scripts/verify_security.sh`) that simulate CI/CD pipeline stages, validate YAML/syntax, verify non-root container enforcement, and test security controls.
-- **Container Hardening**: All Dockerfiles built on penultimate Alpine Linux (`alpine:3.23`) running with an explicit unprivileged non-root user (`USER appuser`, UID 10001) and native container health checks.
-- **OpenAPI 3.0 Specification**: `srcs/api-gateway/openapi.yaml` documents the gateway contract (`openapi: 3.0.3`) for `/health`, `/api/movies`, and `/api/billing`. It is authored and version-controlled as a deliverable artifact; it is not currently served at a runtime `/docs` endpoint.
-
-### 7.1 Considered but not implemented
-
-The following items from the brief's bonus list were evaluated and deliberately **not** wired into the code, so they are not claimed as delivered:
-
-| Item | Status | What exists instead |
-|---|---|---|
-| `tfsec` IaC scanning | Not integrated | `trivy config --severity HIGH,CRITICAL --exit-code 1 infra/` in the `Validate` stage (`infra/.gitlab-ci.yml`) |
-| `Infracost` cost estimation | Not integrated | `terraform plan` artifacts only; no cost comment on merge requests |
-| `Terragrunt` multi-environment DRY config | Not integrated | Plain Terraform roots `infra/environments/staging` and `infra/environments/production` consume the same modules; no `terragrunt.hcl` exists |
-| Renovate dependency bot | Not integrated | `.github/dependabot.yml` is present and correctly targeted — its `terraform` entries point at `infra/environments/staging` and `infra/environments/production`, the two directories that actually hold a `.terraform.lock.hcl` — but `.github/` does not execute in this GitLab-hosted project, so it is not an effective control |
+- **Infrastructure security scan**: `trivy config` in the infra Validate stage, blocking on HIGH and
+  CRITICAL. Trivy replaced tfsec, so tfsec itself is not used.
+- **GitLab platform as code**: Terraform for the GitLab hosts, and Ansible configures GitLab itself
+  through its API (group, projects, merge rules, members, variables, runner).
+- **Verification scripts** that check the pipelines, the security guidelines and each audit
+  question locally.
+- **Unprivileged image builds** with Kaniko, and image builds without push on merge requests.
+- **OpenAPI 3 description** of the gateway in `srcs/api-gateway/openapi.yaml`, served by the
+  gateway as Swagger UI at `/docs` and as YAML at `/openapi.yaml`.

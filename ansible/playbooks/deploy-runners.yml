@@ -1,24 +1,23 @@
 ---
 # Playbook: Deploy and Register GitLab Runners
-# Purpose: Automates Docker executor runner installation, token registration, and systemd management
+# Purpose: Docker executor runner installation, registration with a runner
+# authentication token, and systemd management.
+#
+# Play 1 creates the short-lived admin API token on the GitLab host; play 2 uses it
+# to create (or reuse) the instance runner in GitLab and writes the returned runner
+# token into config.toml. No registration token is needed or committed.
+- name: Create the API token for runner registration on the GitLab server
+  hosts: gitlab_servers
+  become: true
+  gather_facts: false
+
+  roles:
+    - role: gitlab_api_token
+
 - name: Deploy and Configure GitLab Runners
   hosts: gitlab_runners
   become: true
   gather_facts: true
-
-  vars:
-    gitlab_runner_url: "{{ lookup('env', 'GITLAB_EXTERNAL_URL') | default('http://gitlab.example.com', true) }}"
-    gitlab_runner_registration_token: "{{ lookup('env', 'GITLAB_RUNNER_TOKEN') }}"
-    gitlab_runner_executor: "docker"
-    gitlab_runner_default_image: "docker:24.0.5"
-
-  pre_tasks:
-    - name: Fail when GitLab runner token is not provided
-      ansible.builtin.assert:
-        that:
-          - gitlab_runner_registration_token is defined
-          - gitlab_runner_registration_token | length > 0
-        fail_msg: "GITLAB_RUNNER_TOKEN env var (CI masked variable) must be set; no default token is committed."
 
   roles:
     - role: gitlab_runner

@@ -435,14 +435,11 @@ def load_ci(path):
         return None, "YAML parse error: %s" % str(exc).splitlines()[0]
 
 
-# GitLab resolves exactly ONE CI entry point: .gitlab-ci.yml at the repository
-# root. The files under infra/ and srcs/ are `include:` fragments, and the
-# singleton keys GitLab will not merge for them (stages, workflow, default,
-# variables) live in the root file. Reading a fragment in isolation therefore
-# understates it: a fragment that declares no `stages:` is not stage-less, it
-# inherits the root's union list. hoist_singletons() reconstructs the effective
-# view the runner actually sees, so a control can never fail a fragment merely
-# for delegating a singleton to the root.
+# infra/ and each srcs/<service>/ folder is published as its own GitLab project
+# (scripts/publish_repos.sh), where its .gitlab-ci.yml is the root pipeline file
+# and declares its own stages, workflow and default. hoist_singletons() only fills
+# a key that a file leaves out, from a root .gitlab-ci.yml if one exists, so it
+# changes nothing for these standalone files.
 ROOT_CI = ".gitlab-ci.yml"
 HOISTED = ("stages", "workflow", "default")
 
@@ -860,7 +857,9 @@ def h_ansible_roles():
         text = read(pb)
         for m in re.finditer(r'-\s*role:\s*([a-z0-9_]+)', text):
             refs.append((rel(pb), m.group(1)))
-        for blk in re.finditer(r'roles:\s*\n(?:\s*-\s*[^\n#]+\n)+', text):
+        # [ \t]* rather than \s*: \s* crosses the blank line that ends the list and
+        # reads the next play's "- name:" as a role called "name".
+        for blk in re.finditer(r'roles:[ \t]*\n(?:[ \t]*-[ \t]*[^\n#]+\n)+', text):
             for nm in re.finditer(r'-\s*(?:role:\s*)?([a-z][a-z0-9_]*)', blk.group(0)):
                 refs.append((rel(pb), nm.group(1)))
     for pb, role in refs:
@@ -893,8 +892,10 @@ def h_ansible_expected():
     expected = [
         "Install GitLab CE package",
         "Deploy gitlab.rb configuration template",
-        "Configure GitLab application settings and CI/CD parameters via rails runner",
-        "Register GitLab Runner with Docker executor",
+        "Apply authentication, branch protection and CI/CD instance settings",
+        "Create the missing projects",
+        "Create the instance runner in GitLab",
+        "Write the runner configuration (Docker executor, token included)",
         "Check registered runners",
         "Verify GitLab services status",
     ]
@@ -1004,10 +1005,16 @@ def h_runner_files():
     docker = "[runners.docker]" in tpl and "image = \"{{ gitlab_runner_default_image }}\"" in tpl
     privileged = "privileged = {{ gitlab_runner_docker_privileged | lower }}" in tpl
     register = read(R("ansible", "roles", "gitlab_runner", "tasks", "register.yml"))
-    has_reg = "gitlab-runner register" in register and "--tag-list" in register
+    # Runner authentication tokens (glrt-): the runner and its tags are created
+    # through the API (POST /user/runners with tag_list) and config.toml is
+    # templated with the returned token. The legacy registration token flow
+    # (gitlab-runner register --registration-token --tag-list) is disabled by
+    # default since GitLab 17.0.
+    has_reg = "/user/runners" in register and "tag_list" in register and "token" in tpl
     if executor and docker and has_reg:
         emit("RUNNER-FILES", "PASS",
-             "docker executor rendered from config.toml.j2; registration passes --tag-list; privileged=%s"
+             "docker executor rendered from config.toml.j2; runner created through the API with tag_list "
+             "(authentication token); privileged=%s"
              % ("templated false" if privileged else "not templated"),
              ["executor=%s docker_block=%s registration_task=%s"
               % (executor, docker, has_reg)])
@@ -1198,25 +1205,29 @@ def h_infra_independent():
     if err:
         problems.append(err)
     else:
+        # infra/ is published as its own project, so its pipeline works on the
+        # Terraform roots relative to the folder (environments/<env>).
         paths = set()
         for job in jobs(data).values():
             for blob in json.dumps(job, default=str).split():
-                if blob.startswith("infra/"):
-                    paths.add(blob.strip('",\''))
-        detail.append("pipeline scopes infra/** (%d explicit path references)" % len(paths))
-        if not any(p.startswith("infra/") for p in paths):
-            problems.append("no job references infra/** paths: the pipeline cannot build the IaC")
+                blob = blob.strip('",\'')
+                if blob.startswith(("environments/", "infra/")):
+                    paths.add(blob)
+        detail.append("pipeline works on the Terraform roots (%d path references: %s)"
+                      % (len(paths), ", ".join(sorted(paths)[:4])))
+        if not paths:
+            problems.append("no job references environments/<env>: the pipeline cannot build the IaC")
     offenders = workflow_admits_non_main(data) if isinstance(data, dict) else []
     if problems:
         emit("INFRA-INDEPENDENT", "FAIL", "; ".join(problems), detail)
     elif offenders:
         emit("INFRA-INDEPENDENT", "INFO",
-             "infra/ owns its own pipeline building infra/**, but workflow:rules also triggers "
+             "infra/ owns its own pipeline building its Terraform roots, but workflow:rules also triggers "
              "on [%s]; guideline 1 wording expects protected-branch-only triggers "
              "(main-only workflow seen in: CYB1-WORKFLOW)" % "; ".join(offenders[:3]), detail)
     else:
         emit("INFRA-INDEPENDENT", "PASS",
-             "infra/ carries its own main-only pipeline that builds infra/**", detail)
+             "infra/ carries its own main-only pipeline that builds its Terraform roots", detail)
 
 
 # --- microservice CI / CD -----------------------------------------------------
@@ -2691,6 +2702,14 @@ ctl_ansible_listtasks() {
   fi
 }
 
+# The live probes use the inventory Terraform writes for the EC2 hosts when it
+# exists, and the example inventory otherwise.
+if [ -f "${ROOT_DIR}/ansible/inventory/aws.ini" ]; then
+  LIVE_INVENTORY="${ROOT_DIR}/ansible/inventory/aws.ini"
+else
+  LIVE_INVENTORY="${ROOT_DIR}/ansible/inventory/hosts.ini"
+fi
+
 inventory_host() {
   local group="$1"
   awk -v g="${group}" '
@@ -2698,14 +2717,38 @@ inventory_host() {
     /^\[/ {inb=0}
     inb && /ansible_host=/ {
       for (i=1; i<=NF; i++) if ($i ~ /^ansible_host=/) {split($i, a, "="); print a[2]; exit}
-    }' "${ROOT_DIR}/ansible/inventory/hosts.ini" 2>/dev/null | head -1
+    }' "${LIVE_INVENTORY}" 2>/dev/null | head -1
+}
+
+# A key=value from the inventory's [all:vars] section (ansible_user, ansible_ssh_private_key_file).
+inventory_var() {
+  awk -v k="$1" '
+    /^\[all:vars\]/ {inb=1; next}
+    /^\[/ {inb=0}
+    inb && index($0, k "=") == 1 {print substr($0, length(k) + 2); exit}' "${LIVE_INVENTORY}" 2>/dev/null
+}
+
+# user@host and the key the inventory says Ansible uses, so the probe connects the same way.
+ssh_target() {
+  local user
+  user="$(inventory_var ansible_user)"
+  printf '%s%s' "${user:+${user}@}" "$1"
+}
+
+ssh_key_args() {
+  local key
+  key="$(inventory_var ansible_ssh_private_key_file)"
+  key="${key/#\~/${HOME}}"
+  [ -n "${key}" ] && printf -- '-i\n%s\n' "${key}"
 }
 
 ssh_reachable() {
   local host="$1"
   local err
+  local -a key_args=()
+  mapfile -t key_args < <(ssh_key_args)
   err="$(timeout 10 ssh -o BatchMode=yes -o ConnectTimeout=6 -o StrictHostKeyChecking=no \
-    -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "${host}" true 2>&1 >/dev/null)"
+    -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "${key_args[@]}" "$(ssh_target "${host}")" true 2>&1 >/dev/null)"
   SSH_PROBE_ERR="${err}"
   if [ -z "${err}" ]; then
     SSH_PROBE_REASON="ssh_ok"
@@ -2730,7 +2773,7 @@ ssh_reachable() {
 live_probe() {
   local cid="$1" host="$2" question="$3" hint="$4"
   if [ -z "${host}" ]; then
-    emit_result "${cid}" "BLOCKED-EXTERNAL" "no host for this role in ansible/inventory/hosts.ini; ${question} cannot be attempted"
+    emit_result "${cid}" "BLOCKED-EXTERNAL" "no host for this role in ${LIVE_INVENTORY#"${ROOT_DIR}"/}; ${question} cannot be attempted"
     return 0
   fi
   if ssh_reachable "${host}"; then
@@ -2756,7 +2799,7 @@ ctl_runner_live() {
   local host
   host="$(inventory_host gitlab_runners)"
   live_probe RUNNER-LIVE-LIST "${host}" "runner registration/execution cannot be observed locally" \
-    "ssh ${host} 'sudo gitlab-runner list && systemctl is-active gitlab-runner'"
+    "ssh $(ssh_target "${host}") 'sudo gitlab-runner list && systemctl is-active gitlab-runner'"
   if command -v gitlab-runner >/dev/null 2>&1; then
     emit_detail "note: gitlab-runner is installed here but no GitLab instance is reachable"
   else
@@ -2768,7 +2811,7 @@ ctl_gitlab_live() {
   local host
   host="$(inventory_host gitlab_servers)"
   live_probe GITLAB-LIVE-STATUS "${host}" "GitLab service state cannot be observed locally" \
-    "ssh ${host} 'sudo gitlab-ctl status && systemctl is-active gitlab-runsvdir'"
+    "ssh $(ssh_target "${host}") 'sudo gitlab-ctl status && systemctl is-active gitlab-runsvdir'"
 }
 
 ctl_infra_fmt() {
@@ -2997,6 +3040,8 @@ ctl_cyb2_assignment() {
     # characters, and this defers the value rather than excluding the test file,
     # so test_no_hardcoded_fallback_exists stays fully scanned.
     grep -viE '(passwo?r?d|passwd|secret|token|api[_-]?key|access[_-]?key|credential)[[:space:]]*[:=][[:space:]]*"[^"]{1,3}"[[:space:]]*[,)]' |
+    # A boolean is a setting, never a credential (force_random_password: true).
+    grep -viE '(passwo?r?d|passwd|secret|token|api[_-]?key|access[_-]?key|credential)[a-z_]*[[:space:]]*[:=][[:space:]]*(true|false|yes|no)[[:space:]]*$' |
     head -25)"
   local count=0
   [ -n "${matches}" ] && count="$(printf '%s\n' "${matches}" | wc -l | tr -d ' ')"

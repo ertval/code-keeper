@@ -1,33 +1,45 @@
 ---
-- name: Configure GitLab application settings and CI/CD parameters via rails runner
-  ansible.builtin.shell: |
-    gitlab-rails runner "
-      protection_level = {{ gitlab_default_branch_protection }}
-      merge_access = case protection_level
-      when 0 then []
-      when 1 then [Gitlab::Access::DEVELOPER]
-      else [Gitlab::Access::MAINTAINER]
-      end
-      push_access = protection_level < 1 ? [] : [Gitlab::Access::MAINTAINER]
-      settings = ApplicationSetting.current_without_cache
-      settings.update!(
-        signup_enabled: {{ gitlab_signup_enabled | lower }},
-        default_branch_name: '{{ gitlab_default_branch_name }}',
-        default_branch_protection: protection_level,
-        default_branch_protection_defaults: {
-          'allowed_to_push' => push_access,
-          'allowed_to_merge' => merge_access,
-          'allow_force_push' => false
-        },
-        max_artifacts_size: {{ gitlab_artifacts_max_size }},
-        auto_devops_enabled: {{ gitlab_auto_devops_enabled | lower }}
-      )
-      puts 'GitLab CI/CD and Project settings applied successfully'
-    "
-  register: cicd_settings_result
-  changed_when: "'GitLab CI/CD and Project settings applied successfully' in cicd_settings_result.stdout"
-  failed_when: cicd_settings_result.rc != 0
+# Instance settings through the documented REST API (PUT /application/settings).
+# default_branch_protection_defaults takes lists of {access_level: N} objects, the
+# format GitLab stores (for example [{"access_level"=>40}]). A bare list of
+# numbers such as [40] is not that format. The integer default_branch_protection
+# setting is deprecated in favour of this hash, so it is no longer set.
+- name: Apply authentication, branch protection and CI/CD instance settings
+  ansible.builtin.uri:
+    url: "{{ gitlab_local_api_url }}/application/settings"
+    method: PUT
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_api_token_value }}"
+    body_format: json
+    body:
+      signup_enabled: "{{ gitlab_signup_enabled | bool }}"
+      require_two_factor_authentication: "{{ gitlab_require_two_factor_authentication | bool }}"
+      default_projects_limit: "{{ gitlab_default_projects_limit | int }}"
+      default_branch_name: "{{ gitlab_default_branch_name }}"
+      default_branch_protection_defaults:
+        allowed_to_push:
+          - access_level: "{{ gitlab_default_branch_push_access_level | int }}"
+        allowed_to_merge:
+          - access_level: "{{ gitlab_default_branch_merge_access_level | int }}"
+        allow_force_push: "{{ gitlab_default_branch_allow_force_push | bool }}"
+        developer_can_initial_push: false
+      shared_runners_enabled: "{{ gitlab_shared_runners_enabled | bool }}"
+      shared_runners_text: "{{ gitlab_shared_runners_text }}"
+      max_artifacts_size: "{{ gitlab_artifacts_max_size | int }}"
+      auto_devops_enabled: "{{ gitlab_auto_devops_enabled | bool }}"
+    status_code: [200]
+  register: gitlab_settings_result
+  no_log: "{{ gitlab_api_no_log }}"
 
-- name: Report CI/CD settings configuration status
-  ansible.builtin.debug:
-    msg: "GitLab application and CI/CD settings synchronized."
+- name: Check that GitLab stored the branch protection defaults
+  ansible.builtin.assert:
+    that:
+      - gitlab_settings_result.json.signup_enabled == (gitlab_signup_enabled | bool)
+      - >-
+        gitlab_settings_result.json.default_branch_protection_defaults.allowed_to_push
+        | map(attribute='access_level') | list == [gitlab_default_branch_push_access_level | int]
+      - >-
+        gitlab_settings_result.json.default_branch_protection_defaults.allowed_to_merge
+        | map(attribute='access_level') | list == [gitlab_default_branch_merge_access_level | int]
+    fail_msg: "GitLab did not keep the requested instance settings; rerun with gitlab_api_no_log=false to see the response."
+    quiet: true
