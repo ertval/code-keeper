@@ -775,3 +775,20 @@ approval loop ran against a throwaway local group with the same job names; all f
 passed and the app approvals waited for infra production. The group was deleted afterwards.
 shellcheck clean; `scripts/test_pipelines.sh` 0 failed. Not run: a real destroy or restart, and
 the SSH token step on the EC2 GitLab (the session's safety check blocked it).
+
+## 2026-10-22 00:16 EEST: show the questions in stop_aws.sh and publish_repos.sh
+
+**What**
+- `scripts/stop_aws.sh`: the "Type 'stop' to continue" question is printed again. The terminal is
+  opened on its own first, and only that step's error is silenced.
+- `scripts/publish_repos.sh`: the same fix for the password question.
+
+**Why**
+`read -p` prints its question on stderr, and both scripts sent stderr to /dev/null on the same
+line to hide the "no terminal" error, so the question was invisible. The user's first real run
+of `scripts/stop_aws.sh` was cancelled by pressing Enter at a prompt they could not see; nothing
+was changed.
+
+**Verified**
+In a simulated terminal both questions appear and a wrong answer cancels; without a terminal
+`stop_aws.sh` still says to use a terminal or `--yes`. shellcheck clean.

@@ -87,10 +87,14 @@ fi
 # in ~/.git-credentials. The password is asked for once, not once per project.
 if [ -z "${GITLAB_REMOTE_BASE:-}" ] && [ -n "${GITLAB_URL:-}" ] && [ "${DRY_RUN}" -eq 0 ]; then
   if [ -z "${GITLAB_PUSH_TOKEN:-}" ]; then
-    if ! { read -rsp "GitLab password (or token) for ${GITLAB_USER} at ${GITLAB_URL%/}: " GITLAB_PUSH_TOKEN </dev/tty; } 2>/dev/null; then
+    # Only opening the terminal is silenced; the question itself goes to stderr.
+    if ! { exec 3</dev/tty; } 2>/dev/null; then
       echo "ERROR: no terminal to ask for the password; set GITLAB_PUSH_TOKEN instead" >&2
       exit 1
     fi
+    printf 'GitLab password (or token) for %s at %s: ' "${GITLAB_USER}" "${GITLAB_URL%/}" >&2
+    read -rs GITLAB_PUSH_TOKEN <&3 || true
+    exec 3<&-
     echo
   fi
   if [ -z "${GITLAB_PUSH_TOKEN}" ]; then

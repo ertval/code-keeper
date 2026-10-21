@@ -190,9 +190,13 @@ if [ "${DRY_RUN}" -eq 0 ] && [ "${ASSUME_YES}" -eq 0 ]; then
   echo
   echo "This destroys production and staging (their databases included) and stops"
   echo "GitLab and the runner. GitLab's data stays on its disk."
-  if ! { read -rp "Type 'stop' to continue: " answer </dev/tty; } 2>/dev/null; then
-    die "no terminal to ask on; run with --yes"
+  # Only opening the terminal is silenced; the question itself goes to stderr.
+  if ! { exec 3</dev/tty; } 2>/dev/null; then
+    die "no terminal to ask on; run it in a terminal, or with --yes"
   fi
+  printf "Type 'stop' to continue: " >&2
+  read -r answer <&3 || answer=""
+  exec 3<&-
   [ "${answer}" = "stop" ] || die "cancelled, nothing was changed"
 fi
 
